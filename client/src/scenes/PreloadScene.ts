@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { CONFIG } from '@12tails/shared/config';
-import { CHARACTERS } from '../manifest';
+import { CHARACTERS, FACE } from '../manifest';
 
 /**
  * Loads the map and every character listed in characters.json, then hands off
@@ -29,6 +29,10 @@ export class PreloadScene extends Phaser.Scene {
       this.load.spritesheet(c.id, c.sheet, {
         frameWidth: CONFIG.FRAME.W,
         frameHeight: CONFIG.FRAME.H,
+      });
+      this.load.spritesheet(`${c.id}-faces`, c.faces, {
+        frameWidth: FACE.w,
+        frameHeight: FACE.h,
       });
       this.load.image(`${c.id}-thumb`, c.thumb);
     }

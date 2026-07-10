@@ -4,8 +4,11 @@ import type { Direction, PlayerState, ServerToClientEvents } from '@12tails/shar
 import { LocalPlayer } from '../entities/LocalPlayer';
 import { RemotePlayer } from '../entities/RemotePlayer';
 import { connectSocket, type GameSocket } from '../net/socket';
+import { CHARACTERS, FACE } from '../manifest';
 import { ChatBubble } from '../ui/ChatBubble';
 import { ChatOverlay } from '../ui/ChatOverlay';
+import { EmoteEffect } from '../ui/EmoteEffect';
+import { EmoteWheel } from '../ui/EmoteWheel';
 
 interface WorldInit {
   characterId: string;
@@ -34,6 +37,8 @@ export class WorldScene extends Phaser.Scene {
   private lastSent: SentState | null = null;
   private chat!: ChatOverlay;
   private bubbles = new Map<string, ChatBubble>();
+  private emoteWheel!: EmoteWheel;
+  private emotes = new Map<string, EmoteEffect>();
 
   constructor() {
     super('World');
@@ -77,6 +82,42 @@ export class WorldScene extends Phaser.Scene {
 
     this.setupNetwork(init);
     this.setupChat();
+    this.setupEmotes(init);
+  }
+
+  // ---------------------------------------------------------------- emotes
+
+  private setupEmotes(init: WorldInit) {
+    const def = CHARACTERS.find((c) => c.id === init.characterId) ?? CHARACTERS[0];
+    this.emoteWheel = new EmoteWheel({
+      facesUrl: def.faces,
+      emotes: FACE.emotes,
+      onPick: (emoteId) => this.socket.emit('emote:send', { emoteId }),
+    });
+
+    const onEmote: ServerToClientEvents['emote:played'] = ({ id, emoteId }) => {
+      this.showEmote(id, emoteId);
+    };
+    this.socket.on('emote:played', onEmote);
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.socket.off('emote:played', onEmote);
+      for (const e of this.emotes.values()) e.destroy();
+      this.emotes.clear();
+      this.emoteWheel.destroy();
+    });
+  }
+
+  private showEmote(playerId: string, emoteId: string) {
+    const target = playerId === this.socket.id ? this.player : this.remotes.get(playerId);
+    if (!target) return; // speaker not visible
+    const frameIndex = FACE.emotes.indexOf(emoteId);
+    if (frameIndex < 0) return; // unknown emote id — ignore
+    const facesKey = `${target.texture.key}-faces`;
+    if (!this.textures.exists(facesKey)) return;
+
+    this.emotes.get(playerId)?.destroy();
+    this.emotes.set(playerId, new EmoteEffect(this, facesKey, frameIndex));
   }
 
   // ------------------------------------------------------------------ chat
@@ -115,8 +156,8 @@ export class WorldScene extends Phaser.Scene {
     this.bubbles.set(playerId, new ChatBubble(this, text));
   }
 
-  /** Anchor each live bubble just above its speaker's name tag. */
-  private updateBubbles() {
+  /** Anchor live bubbles/emotes to their speaker each frame. */
+  private updateOverheads() {
     for (const [id, bubble] of this.bubbles) {
       if (!bubble.active) {
         this.bubbles.delete(id); // expired (BUBBLE_MS)
@@ -129,6 +170,20 @@ export class WorldScene extends Phaser.Scene {
         continue;
       }
       bubble.setPosition(target.x, target.y - CONFIG.FRAME.H * 0.55 - 18);
+    }
+
+    for (const [id, emote] of this.emotes) {
+      if (!emote.active) {
+        this.emotes.delete(id); // expired (EMOTE_SHOW_MS)
+        continue;
+      }
+      const target = id === this.socket.id ? this.player : this.remotes.get(id);
+      if (!target) {
+        emote.destroy();
+        this.emotes.delete(id);
+        continue;
+      }
+      emote.follow(target);
     }
   }
 
@@ -235,7 +290,7 @@ export class WorldScene extends Phaser.Scene {
     this.player.update();
     this.nameTag.setPosition(this.player.x, this.player.y - CONFIG.FRAME.H * 0.55);
     for (const r of this.remotes.values()) r.update();
-    this.updateBubbles();
+    this.updateOverheads();
     this.sendMove(delta);
   }
 }

@@ -41,6 +41,9 @@ function sanitizeChat(raw: unknown): string {
     .slice(0, CONFIG.CHAT_MAX_LEN);
 }
 
+/** Last emote timestamp per socket — server-side spam guard. */
+const lastEmoteAt = new Map<string, number>();
+
 export function registerHandlers(io: IO, socket: Sock) {
   socket.on('player:join', (p) => {
     const player: PlayerState = {
@@ -85,7 +88,19 @@ export function registerHandlers(io: IO, socket: Sock) {
     io.emit('chat:message', msg); // everyone, sender included (single render path)
   });
 
+  socket.on('emote:send', (p) => {
+    if (!world.get(socket.id)) return; // must join before emoting
+    const emoteId = String(p?.emoteId ?? '').slice(0, 32);
+    if (!emoteId) return;
+    const now = Date.now();
+    const last = lastEmoteAt.get(socket.id) ?? 0;
+    if (now - last < CONFIG.EMOTE_COOLDOWN_MS) return; // spam guard
+    lastEmoteAt.set(socket.id, now);
+    io.emit('emote:played', { id: socket.id, emoteId }); // id only — clients own the art
+  });
+
   socket.on('disconnect', () => {
+    lastEmoteAt.delete(socket.id);
     if (world.remove(socket.id)) {
       socket.broadcast.emit('player:left', { id: socket.id });
       console.log(`[server] left: ${socket.id} · ${world.count} online`);
