@@ -1,10 +1,7 @@
 import Phaser from 'phaser';
 import { CONFIG } from '@12tails/shared/config';
 import type { Direction } from '@12tails/shared/events';
-
-const COLS = 5; // sprite sheet columns — see characters.json `frame.cols`
-const ROW: Record<Direction, number> = { down: 0, up: 1, left: 2, right: 3 };
-const DIRS: Direction[] = ['down', 'up', 'left', 'right'];
+import { ensureWalkAnims, idleFrame, walkAnimKey } from './anims';
 
 /**
  * Local, keyboard-driven player. Client-authoritative movement via Arcade
@@ -15,9 +12,10 @@ export class LocalPlayer extends Phaser.Physics.Arcade.Sprite {
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd: Record<'up' | 'down' | 'left' | 'right', Phaser.Input.Keyboard.Key>;
   private facing: Direction = 'down';
+  private movingNow = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string) {
-    super(scene, x, y, texture, ROW.down * COLS + 0);
+    super(scene, x, y, texture, idleFrame('down'));
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
@@ -40,24 +38,7 @@ export class LocalPlayer extends Phaser.Physics.Arcade.Sprite {
       right: Phaser.Input.Keyboard.KeyCodes.D,
     }) as LocalPlayer['wasd'];
 
-    this.createAnims(texture);
-    this.setFrame(ROW[this.facing] * COLS + 0);
-  }
-
-  private createAnims(texture: string) {
-    for (const dir of DIRS) {
-      const key = `${texture}-walk-${dir}`;
-      if (this.scene.anims.exists(key)) continue;
-      const base = ROW[dir] * COLS;
-      this.scene.anims.create({
-        key,
-        frames: this.scene.anims.generateFrameNumbers(texture, {
-          frames: [base + 1, base + 2, base + 3, base + 4],
-        }),
-        frameRate: 8,
-        repeat: -1,
-      });
-    }
+    ensureWalkAnims(scene, texture);
   }
 
   update() {
@@ -80,20 +61,27 @@ export class LocalPlayer extends Phaser.Physics.Arcade.Sprite {
     }
     this.setVelocity(vx, vy);
 
-    const moving = vx !== 0 || vy !== 0;
-    if (moving) {
+    this.movingNow = vx !== 0 || vy !== 0;
+    if (this.movingNow) {
       // Face the dominant axis of motion.
       if (Math.abs(vx) > Math.abs(vy)) this.facing = vx < 0 ? 'left' : 'right';
       else this.facing = vy < 0 ? 'up' : 'down';
-      this.anims.play(`${this.texture.key}-walk-${this.facing}`, true);
+      this.anims.play(walkAnimKey(this.texture.key, this.facing), true);
     } else {
       this.anims.stop();
-      this.setFrame(ROW[this.facing] * COLS + 0);
+      this.setFrame(idleFrame(this.facing));
     }
+
+    this.setDepth(this.y); // simple y-sort so overlapping players stack sanely
   }
 
-  /** Current facing — used by later phases when broadcasting movement. */
+  /** Current facing — broadcast to the server in player:move. */
   get direction(): Direction {
     return this.facing;
+  }
+
+  /** Whether the player moved this frame — broadcast in player:move. */
+  get isMoving(): boolean {
+    return this.movingNow;
   }
 }

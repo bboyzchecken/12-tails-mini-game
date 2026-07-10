@@ -73,7 +73,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     );
     const input = this.nameInput.node as HTMLInputElement;
     input.placeholder = 'ชื่อเล่น';
-    input.maxLength = 16;
+    input.maxLength = CONFIG.NAME_MAX_LEN;
     input.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') this.enterWorld();
@@ -111,7 +111,7 @@ export class CharacterSelectScene extends Phaser.Scene {
   private enterWorld() {
     const def = CHARACTERS[this.selected];
     const input = this.nameInput.node as HTMLInputElement;
-    const name = input.value.trim().slice(0, CONFIG.CHAT_MAX_LEN) || 'ผู้เล่น';
+    const name = input.value.trim().slice(0, CONFIG.NAME_MAX_LEN) || 'ผู้เล่น';
     this.scene.start('World', { characterId: def.id, name });
   }
 }

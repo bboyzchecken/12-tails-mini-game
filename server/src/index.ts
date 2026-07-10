@@ -4,6 +4,8 @@ import cors from 'cors';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@12tails/shared/events';
 import { CONFIG } from '@12tails/shared/config';
+import { world } from './world';
+import { registerHandlers } from './handlers';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
@@ -18,11 +20,12 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
 });
 
 app.get('/health', (_req, res) => {
-  res.json({ ok: true, players: io.engine.clientsCount });
+  res.json({ ok: true, players: world.count });
 });
 
 io.on('connection', (socket) => {
   console.log('[server] client connected:', socket.id);
+  registerHandlers(io, socket);
 
   socket.on('disconnect', (reason) => {
     console.log('[server] client disconnected:', socket.id, '·', reason);
