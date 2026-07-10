@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ลานชุมชน 12 หาง — เว็บแชทสำหรับแฟนเกม</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --cream: #FDF5EA; --cream-2: #FBEEDD; --ink: #4A3629; --soft: #7E6959;
+    --muted: #A9927E; --accent: #EE8C43; --accent-ink: #B5611F; --accent-soft: #FCE6CF;
+    --mint: #4FA595; --mint-soft: #DBEFEA; --card: #FFFFFF; --line: #F0E0CC;
+    --r: 18px; --r-sm: 12px;
+  }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Sarabun', sans-serif; color: var(--ink); background: var(--cream); line-height: 1.7; font-size: 17px; -webkit-font-smoothing: antialiased; }
+  h1,h2,h3,.logo,.btn,.eyebrow,.tribe-name { font-family: 'Mitr', sans-serif; font-weight: 500; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+  a { color: var(--accent-ink); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+  /* Nav */
+  nav { padding: 22px 0; }
+  nav .wrap { display: flex; align-items: center; justify-content: space-between; }
+  .logo { font-weight: 700; font-size: 1.25rem; color: var(--ink); display: flex; align-items: center; gap: 9px; }
+  .logo .mark { width: 30px; height: 30px; border-radius: 9px; background: var(--accent); display: grid; place-items: center; color: #fff; font-size: 0.95rem; }
+  .navlinks { display: flex; gap: 22px; align-items: center; font-size: 0.96rem; }
+  .navlinks a { color: var(--soft); text-decoration: none; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; cursor: pointer;
+         font-size: 1rem; padding: 12px 22px; border-radius: 999px; background: var(--accent); color: #fff; text-decoration: none; transition: transform .12s ease, filter .12s ease; }
+  .btn:hover { filter: brightness(1.04); transform: translateY(-1px); }
+  .btn.ghost { background: #fff; color: var(--accent-ink); border: 1.5px solid var(--accent-soft); }
+
+  /* Hero */
+  .hero { padding: 40px 0 20px; position: relative; }
+  .hero::before { content:""; position:absolute; inset:0 0 auto 0; height:520px; background: radial-gradient(60% 70% at 50% 0%, #FEF3E4 0%, var(--cream) 70%); z-index:-1; }
+  .hero-inner { text-align: center; max-width: 720px; margin: 0 auto; }
+  .badge { display:inline-block; font-family:'Mitr'; font-size: 13px; font-weight:500; color: var(--mint); background: var(--mint-soft); padding: 6px 14px; border-radius: 999px; margin-bottom: 20px; }
+  h1 { font-weight: 700; font-size: clamp(2.1rem, 5.5vw, 3.3rem); line-height: 1.2; letter-spacing: .2px; }
+  h1 .hl { color: var(--accent); }
+  .lead { font-size: 1.14rem; color: var(--soft); margin: 18px auto 0; max-width: 54ch; }
+  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+
+  .wait { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top: 16px; }
+  .wait input { font-family:'Sarabun'; font-size: 0.98rem; padding: 11px 16px; border:1.5px solid var(--line); border-radius: 999px; min-width: 240px; background:#fff; color:var(--ink); }
+  .wait .hint { flex-basis:100%; font-size:0.85rem; color:var(--muted); margin-top:2px; }
+
+  /* Hero art window */
+  .stage { margin: 40px auto 0; max-width: 900px; background: linear-gradient(180deg,#FCEBD7,#F7DFC6); border:1px solid var(--line); border-radius: 24px; padding: 20px; box-shadow: 0 18px 40px rgba(150,100,50,.14); }
+  .stage-inner { border-radius: 16px; background: #FFF9F0; border: 2px dashed #E4C9A6; min-height: 240px; display:flex; align-items:center; justify-content:center; text-align:center; padding: 24px; }
+  .stage-inner span { color: var(--muted); font-family:'Mitr'; }
+
+  /* Sections */
+  section { padding: 60px 0; }
+  .eyebrow { text-align:center; font-size: 12.5px; letter-spacing: 2px; color: var(--accent-ink); text-transform: uppercase; margin-bottom: 8px; }
+  h2 { text-align:center; font-weight:600; font-size: 1.7rem; }
+  .section-sub { text-align:center; color: var(--soft); max-width: 52ch; margin: 10px auto 0; }
+
+  /* Features */
+  .feat { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-top: 38px; }
+  .fcard { background: var(--card); border:1px solid var(--line); border-radius: var(--r); padding: 24px; }
+  .fico { width:44px; height:44px; border-radius: 12px; background: var(--accent-soft); color: var(--accent-ink); display:grid; place-items:center; margin-bottom: 14px; }
+  .fico svg { width:22px; height:22px; }
+  .fcard h3 { font-size: 1.08rem; font-weight:600; margin-bottom: 6px; }
+  .fcard p { color: var(--soft); font-size: 0.97rem; }
+
+  /* Tribes */
+  .tribes { background: var(--cream-2); }
+  .tgrid { display:grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 14px; margin-top: 38px; }
+  .tribe { background:#fff; border:1px solid var(--line); border-radius: var(--r); padding: 14px; text-align:center; }
+  .tribe .art { border-radius: var(--r-sm); background: #FFF9F0; border: 2px dashed #E4C9A6; aspect-ratio: 1/1; display:grid; place-items:center; color: var(--muted); font-size: 0.82rem; font-family:'Mitr'; margin-bottom: 10px; }
+  .tribe.ready .art { border-style: solid; border-color: var(--mint); background: var(--mint-soft); color: var(--mint); }
+  .tribe-name { font-size: 0.98rem; font-weight:500; }
+  .tribe .status { font-size: 0.78rem; color: var(--muted); }
+  .tribe.ready .status { color: var(--mint); }
+
+  /* Community */
+  .cta-band { background: var(--card); border:1px solid var(--line); border-radius: 24px; padding: 44px 28px; text-align:center; box-shadow: 0 14px 34px rgba(150,100,50,.10); }
+  .cta-band h2 { margin-bottom: 8px; }
+  .cta-band p { color: var(--soft); max-width: 46ch; margin: 0 auto 22px; }
+
+  /* Footer */
+  footer { padding: 44px 0 64px; border-top:1px solid var(--line); margin-top: 30px; }
+  footer .wrap { display:flex; flex-wrap:wrap; justify-content:space-between; gap:16px; align-items:center; }
+  footer .note { font-size: 0.86rem; color: var(--muted); max-width: 60ch; }
+  footer .links { display:flex; gap:18px; font-size:0.92rem; }
+  footer .links a { color: var(--soft); text-decoration:none; }
+
+  @media (max-width:560px){ .navlinks a:not(.btn){ display:none; } section{ padding:44px 0; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="logo"><span class="mark">12</span> ลานชุมชน 12 หาง</div>
+    <div class="navlinks">
+      <a href="#feat">ฟีเจอร์</a>
+      <a href="#tribes">12 เผ่า</a>
+      <a href="#join" class="btn ghost">เข้าลานชุมชน</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap hero-inner">
+    <span class="badge">เว็บแชทสำหรับแฟนเกม · fan project</span>
+    <h1>กลับมาเจอเพื่อนเก่า<br>ใน<span class="hl">ลานชุมชน 12 หาง</span></h1>
+    <p class="lead">เลือกตัวละครจาก 12 เผ่า เดินเล่นในแมพ แชทลอยเหนือหัว และ emote พร้อมเสียง — พื้นที่ให้คนที่ยังรักเกมได้มาแฮงก์เอาต์ด้วยกัน</p>
+    <div class="cta-row">
+      <a href="#join" class="btn">เข้าลานชุมชน</a>
+      <a href="#feat" class="btn ghost">ดูว่ามีอะไรบ้าง</a>
+    </div>
+    <form class="wait" id="wait">
+      <input type="email" id="email" placeholder="อีเมลของคุณ" aria-label="อีเมล" required>
+      <button class="btn" type="submit">รับข่าวเปิดตัว</button>
+      <span class="hint" id="waithint">กรอกไว้เพื่อรับแจ้งเตือนตอนเปิดจริง</span>
+    </form>
+    <div class="stage">
+      <div class="stage-inner"><span>[ ภาพหน้าเกม / อาร์ตตัวละคร 12 เผ่า — ใส่ที่นี่ ]</span></div>
+    </div>
+  </div>
+</header>
+
+<section id="feat">
+  <div class="wrap">
+    <div class="eyebrow">ระบบสื่อสารที่เป็นหัวใจของ 12 หาง</div>
+    <h2>ไม่ใช่เกมต่อสู้ — เป็นลานให้มาเจอกัน</h2>
+    <div class="feat">
+      <div class="fcard">
+        <div class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v16h16"/><path d="m5 19 6-6 4 4 5-5"/></svg></div>
+        <h3>เดินในแมพร่วมกัน</h3><p>เลือก 1 ใน 12 เผ่า แล้วเดินสำรวจลานชุมชนไปพร้อมคนอื่น</p>
+      </div>
+      <div class="fcard">
+        <div class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <h3>แชทลอยเหนือหัว</h3><p>พิมพ์แล้วข้อความเด้งขึ้นเหนือตัวละครแบบเรียลไทม์</p>
+      </div>
+      <div class="fcard">
+        <div class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/></svg></div>
+        <h3>Emote + เสียง</h3><p>กด emote แล้วตัวละครรีแอคตามพร้อมเสียง เหมือนในเกมเดิม</p>
+      </div>
+      <div class="fcard">
+        <div class="fico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 7v10l8 5 8-5V7z"/><path d="M12 22V12M4 7l8 5 8-5"/></svg></div>
+        <h3>ชุด &amp; cosmetic</h3><p>แต่งตัวละคร เปลี่ยนสี กรอบแชท และ emote ให้เป็นสไตล์ตัวเอง</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tribes" class="tribes">
+  <div class="wrap">
+    <div class="eyebrow">เลือกเผ่าของคุณ</div>
+    <h2>ฮีโร่ทั้ง 12 เผ่า</h2>
+    <p class="section-sub">อาร์ตตัวละครใส่ทีหลัง — ตอนนี้หมากับแกะพร้อมเป็นสองตัวแรก</p>
+    <div class="tgrid" id="tgrid"></div>
+  </div>
+</section>
+
+<section id="join">
+  <div class="wrap">
+    <div class="cta-band">
+      <div class="eyebrow">ชุมชน</div>
+      <h2>มารวมตัวกัน</h2>
+      <p>เข้าลานชุมชนไปเดินเล่นแชทกัน หรือเข้ากลุ่มเพื่อไม่พลาดข่าวเปิดตัวและกิจกรรม</p>
+      <div class="cta-row">
+        <a href="#" class="btn">เข้าลานชุมชน (เดโม)</a>
+        <a href="#" class="btn ghost">เข้ากลุ่ม Discord</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p class="note">โปรเจกต์นี้เป็นผลงานของแฟนเกม 12 หางออนไลน์ ไม่ใช่ผลิตภัณฑ์ทางการ · อาร์ตและตัวละครเป็นลิขสิทธิ์ของเจ้าของเกม · [ใส่หมายเหตุลิขสิทธิ์/ติดต่อจริงก่อนเผยแพร่]</p>
+    <div class="links"><a href="#">ติดต่อ</a><a href="#">Discord</a><a href="#">Privacy</a></div>
+  </div>
+</footer>
+
+<script>
+  // 12 tribe placeholders (หมา/แกะ = พร้อม)
+  const tribes = [
+    {n:'หมา', ready:true}, {n:'แกะ', ready:true},
+    {n:'เผ่า 3'},{n:'เผ่า 4'},{n:'เผ่า 5'},{n:'เผ่า 6'},
+    {n:'เผ่า 7'},{n:'เผ่า 8'},{n:'เผ่า 9'},{n:'เผ่า 10'},
+    {n:'เผ่า 11'},{n:'เผ่า 12'}
+  ];
+  document.getElementById('tgrid').innerHTML = tribes.map(t => `
+    <div class="tribe ${t.ready?'ready':''}">
+      <div class="art">${t.ready?'อาร์ตพร้อม':'[อาร์ต]'}</div>
+      <div class="tribe-name">${t.n}</div>
+      <div class="status">${t.ready?'พร้อมแล้ว':'เร็วๆ นี้'}</div>
+    </div>`).join('');
+
+  // waitlist (mockup — wires to /api/waitlist ในเวอร์ชันจริง)
+  document.getElementById('wait').addEventListener('submit', (e) => {
+    e.preventDefault();
+    document.getElementById('waithint').textContent = 'ขอบคุณ! (เดโม — ยังไม่ได้ส่งจริง)';
+    document.getElementById('email').value = '';
+  });
+</script>
+</body>
+</html>
