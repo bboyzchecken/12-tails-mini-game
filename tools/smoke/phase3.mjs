@@ -39,7 +39,8 @@ try {
   const snapA = waitFor(A, 'world:snapshot');
   A.emit('player:join', { characterId: 'dog', name: 'ผู้เล่น A', x: 400, y: 300, dir: 'down' });
   const sA = await snapA;
-  check('A gets snapshot with itself only', sA.players.length === 1 && sA.players[0].id === A.id);
+  // Real players may be online — assert membership, not exact counts.
+  check('A snapshot contains A', sA.players.some((p) => p.id === A.id));
 
   // --- B joins; A hears about it ----------------------------------------
   const joinedAtA = waitFor(A, 'player:joined');
@@ -53,7 +54,10 @@ try {
     x: 400, y: 300, dir: 'down',
   });
   const sB = await snapB;
-  check('B snapshot has both players', sB.players.length === 2);
+  check(
+    'B snapshot contains A and B',
+    sB.players.some((p) => p.id === A.id) && sB.players.some((p) => p.id === bId),
+  );
   const j = await joinedAtA;
   check('A receives player:joined for B', j.player.id === bId && j.player.characterId === 'sheep');
   check(

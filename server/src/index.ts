@@ -8,15 +8,19 @@ import { world } from './world';
 import { registerHandlers } from './handlers';
 
 const PORT = Number(process.env.PORT ?? 3001);
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
+// Comma-separated allowlist, e.g. "https://12tails.vercel.app,http://localhost:5173"
+const CLIENT_ORIGINS = (process.env.CLIENT_ORIGIN ?? 'http://localhost:5173')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 const app = express();
-app.use(cors({ origin: CLIENT_ORIGIN }));
+app.use(cors({ origin: CLIENT_ORIGINS }));
 
 const httpServer = createServer(app);
 
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
-  cors: { origin: CLIENT_ORIGIN, methods: ['GET', 'POST'] },
+  cors: { origin: CLIENT_ORIGINS, methods: ['GET', 'POST'] },
 });
 
 app.get('/health', (_req, res) => {
@@ -34,4 +38,5 @@ io.on('connection', (socket) => {
 
 httpServer.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT} · spawn =`, CONFIG.SPAWN);
+  console.log('[server] allowed origins:', CLIENT_ORIGINS.join(', '));
 });

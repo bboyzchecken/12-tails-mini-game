@@ -1,0 +1,15 @@
+# Render blueprint — deploy the game server (Socket.IO, WebSocket-capable).
+# ใช้โดย: Render dashboard → New → Blueprint → ชี้มาที่ repo นี้
+services:
+  - type: web
+    name: 12tails-chat-server
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      # ตั้งเป็น origin ของ client ที่ deploy แล้ว (คั่นหลายตัวด้วย comma)
+      # เช่น https://12tails-chat.vercel.app,http://localhost:5173
+      - key: CLIENT_ORIGIN
+        sync: false
