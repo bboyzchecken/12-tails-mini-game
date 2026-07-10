@@ -1,0 +1,31 @@
+# 12Tails Chat — Project Guide
+
+## What this is
+2D top-down multiplayer chat-map web app for 12 Tails Online fans.
+Pick a character, walk a shared map, chat globally, play emotes.
+Characters are 2.5D: sprites pre-rendered from the game's 3D models.
+
+## Stack
+- client: Vite + TypeScript + Phaser 3
+- server: Node.js + Express + Socket.IO + TypeScript
+- shared: TypeScript contracts imported by both
+- maps: Tiled (JSON)
+
+## Repo layout
+/client, /server, /shared, /tools — see 12tails-chat-PLAN.md.
+
+## Node / tooling
+- Requires Node 20+ (see .nvmrc). Run `nvm use` before installing/running.
+- npm workspaces. `npm install` at the root installs all packages.
+- `npm run dev` starts server + client together. `npm run typecheck` checks all packages.
+
+## Hard rules
+- All Socket.IO event names + payload types live in /shared/events.ts. Import them; never inline event shapes.
+- Constants (tile size, speeds, rates) live in /shared/config.ts. Never hardcode.
+- Server is a relay only for positions (no server-side physics). It holds in-memory world state.
+- Throttle player:move to CONFIG.MOVE_SEND_HZ. Interpolate remote players with CONFIG.LERP.
+- Sanitize all chat text on the server before broadcasting (max CONFIG.CHAT_MAX_LEN, strip HTML).
+- Use placeholder assets (Kenney CC0) until real sprites exist. Load characters from characters.json; don't assume specific character ids in code.
+
+## Build order
+Implement 12tails-chat-PLAN.md phase by phase. Do NOT start a phase until the previous phase's acceptance criteria pass. Commit after each phase.
