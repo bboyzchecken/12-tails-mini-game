@@ -5,10 +5,17 @@ import { LocalPlayer } from '../entities/LocalPlayer';
 import { RemotePlayer } from '../entities/RemotePlayer';
 import { connectSocket, type GameSocket } from '../net/socket';
 import { CHARACTERS, FACE } from '../manifest';
+import { gameToUI, uiToGame } from '../ui/bus';
 import { ChatBubble } from '../ui/ChatBubble';
 import { ChatOverlay } from '../ui/ChatOverlay';
 import { EmoteEffect } from '../ui/EmoteEffect';
 import { EmoteWheel } from '../ui/EmoteWheel';
+
+/** ชื่อแมพที่แสดงบน HUD (ย้ายไป map data เมื่อมีหลายแมพ) */
+const MAP_NAME = 'ค่ายมือใหม่';
+/** ค่าโชว์บน HUD จนกว่าจะมีระบบ progression/wallet จริง (demo — ดู monetization plan) */
+const DEMO_SELF = { level: 1, xp: 20, xpMax: 100 };
+const DEMO_WALLET = { jil: 1200, coins: 300 };
 
 interface WorldInit {
   characterId: string;
@@ -83,6 +90,31 @@ export class WorldScene extends Phaser.Scene {
     this.setupNetwork(init);
     this.setupChat();
     this.setupEmotes(init);
+    this.setupUIBridge(init);
+  }
+
+  // ------------------------------------------------------------- UI bridge
+
+  /** ป้อนข้อมูลโลกให้ DOM UI ผ่าน bus เท่านั้น (ห้ามแตะ DOM ตรงๆ) */
+  private setupUIBridge(init: WorldInit) {
+    gameToUI.emit('room:name', { name: MAP_NAME });
+    gameToUI.emit('player:self', {
+      characterId: init.characterId,
+      name: init.name,
+      ...DEMO_SELF,
+    });
+    gameToUI.emit('player:currency', DEMO_WALLET);
+    this.emitOnline();
+
+    // U2 จะผูกกับ MusicPlayer จริง — ตอนนี้แค่พิสูจน์ขา UI→game
+    const offMusic = uiToGame.on('music:toggle', () => {
+      console.log('[world] bus OK: music:toggle received');
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, offMusic);
+  }
+
+  private emitOnline() {
+    gameToUI.emit('players:count', { online: 1 + this.remotes.size });
   }
 
   // ---------------------------------------------------------------- emotes
@@ -219,6 +251,7 @@ export class WorldScene extends Phaser.Scene {
           this.remotes.delete(id);
         }
       }
+      this.emitOnline();
     };
 
     const onJoined: ServerToClientEvents['player:joined'] = ({ player }) => {
@@ -232,6 +265,7 @@ export class WorldScene extends Phaser.Scene {
     const onLeft: ServerToClientEvents['player:left'] = ({ id }) => {
       this.remotes.get(id)?.destroy();
       this.remotes.delete(id);
+      this.emitOnline();
     };
 
     this.socket.on('world:snapshot', onSnapshot);
@@ -257,6 +291,7 @@ export class WorldScene extends Phaser.Scene {
   private addRemote(state: PlayerState) {
     if (this.remotes.has(state.id)) return;
     this.remotes.set(state.id, new RemotePlayer(this, state));
+    this.emitOnline();
   }
 
   /** Broadcast our movement at most CONFIG.MOVE_SEND_HZ times per second. */

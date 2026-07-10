@@ -27,5 +27,16 @@ Characters are 2.5D: sprites pre-rendered from the game's 3D models.
 - Sanitize all chat text on the server before broadcasting (max CONFIG.CHAT_MAX_LEN, strip HTML).
 - Use placeholder assets (Kenney CC0) until real sprites exist. Load characters from characters.json; don't assume specific character ids in code.
 
+## UI rules
+- UI = DOM overlay over the Phaser canvas. Never build panels/buttons/forms inside Phaser.
+- All game <-> UI communication goes through /ui/bus.ts (typed). UI never touches the scene directly; scene never touches the DOM directly.
+- UI tokens live in /ui/ui.css. Reuse .panel and .btn; never hardcode colors.
+- Store UI is DEMO ONLY: persistent DEMO banner, every buy/top-up labeled "(demo)", no payment integration, Jil is fake, include a reset button. Never use ฿/$ for Jil.
+- Equipped cosmetics MUST render in the world (via bus -> scene), not just in the menu.
+- HUD/panels/modals must be responsive down to mobile; canvas + overlay scale together.
+- Build U-phases (12tails-ui-roadmap.md) in order; a phase's acceptance criteria must pass before the next.
+
 ## Build order
-Implement 12tails-chat-PLAN.md phase by phase. Do NOT start a phase until the previous phase's acceptance criteria pass. Commit after each phase.
+Implement 12tails-chat-PLAN.md phase by phase (core mechanics — done), then
+12tails-ui-roadmap.md U0–U6 (UI + demo business model). Do NOT start a phase
+until the previous phase's acceptance criteria pass. Commit after each phase.

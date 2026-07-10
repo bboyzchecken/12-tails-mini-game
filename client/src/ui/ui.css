@@ -1,0 +1,126 @@
+/*
+ * UI design tokens + base primitives (12tails-ui-roadmap.md §4)
+ * ทิศทาง: อบอุ่น กลมมน น่ารัก — panel ครีมอุ่น ปุ่มส้มอุ่น/มิ้นต์
+ * กติกา: UI ทุกชิ้น reuse .panel / .btn และ var() เท่านั้น ห้าม hardcode สี
+ */
+:root {
+  --panel: #fff9f0;
+  --panel-line: #ecd9c2;
+  --panel-shadow: 0 6px 20px rgba(120, 80, 40, 0.12);
+  --ui-ink: #4a3b2e;
+  --ui-muted: #9a8574;
+  --ui-accent: #e8944a; /* ส้มอุ่น (ปุ่มหลัก) */
+  --ui-accent-2: #6fb0a6; /* เขียวมิ้นต์ (secondary) */
+  --ui-danger: #c62f2f; /* ใช้กับ DEMO banner / คำเตือน */
+  --radius-panel: 16px;
+  --radius-btn: 12px;
+  --font-head: 'Mitr', 'Leelawadee UI', sans-serif;
+  --font-body: 'Sarabun', 'Krub', 'Leelawadee UI', sans-serif;
+}
+
+/* Overlay root: ทับ canvas ทั้งจอ, โปร่งต่อ pointer โดย default —
+   คอมโพเนนต์ที่รับคลิกต้องเปิด pointer-events เอง */
+#ui-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ui-ink);
+}
+@media (max-width: 640px) {
+  #ui-root {
+    font-size: 12.5px;
+  }
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--panel-shadow);
+}
+
+.btn {
+  border-radius: var(--radius-btn);
+  font-family: var(--font-head);
+  font-size: 1em;
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 0.45em 1.1em;
+  pointer-events: auto;
+  transition:
+    filter 0.12s,
+    transform 0.06s;
+}
+.btn:hover {
+  filter: brightness(1.06);
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn-primary {
+  background: var(--ui-accent);
+  color: #fff;
+}
+.btn-secondary {
+  background: var(--ui-accent-2);
+  color: #fff;
+}
+.btn-ghost {
+  background: transparent;
+  border-color: var(--panel-line);
+  color: var(--ui-ink);
+}
+
+/* ---- DEMO banner (ค้างบนสุดตลอด — safeguard บังคับ) ---- */
+.demo-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ui-danger);
+  color: #fff;
+  font-family: var(--font-head);
+  font-size: 0.92em;
+  letter-spacing: 0.02em;
+  padding: 5px 16px;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(160, 20, 20, 0.35);
+  white-space: nowrap;
+}
+
+/* ---- Dev bus probe (ชั่วคราว — พิสูจน์ bus สองทาง, ถูกแทนด้วย HUD จริงใน U1) ---- */
+.bus-probe {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 14px;
+  min-width: 280px;
+  pointer-events: auto;
+  font-size: 0.92em;
+}
+.bus-probe .probe-title {
+  font-family: var(--font-head);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.bus-probe .probe-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bus-probe .probe-row .k {
+  color: var(--ui-muted);
+}
+.bus-probe .probe-status {
+  color: var(--ui-accent-2);
+  min-height: 1.2em;
+  margin-top: 4px;
+}
+.bus-probe .btn {
+  margin-top: 6px;
+  width: 100%;
+}

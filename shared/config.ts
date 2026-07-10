@@ -10,4 +10,5 @@ export const CONFIG = {
   EMOTE_COOLDOWN_MS: 3000,
   EMOTE_SHOW_MS: 2500,      // อายุ balloon + หน้า emote เหนือหัว
   SPAWN: { x: 400, y: 300 },
+  DEMO_STORE: true,         // เปิดชั้น UI โมเดลรายได้ (mock ทั้งหมด — ดู 12tails-demo-monetization-plan.md)
 } as const;
