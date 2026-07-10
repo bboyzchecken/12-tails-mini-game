@@ -4,6 +4,8 @@ import type { Direction, PlayerState, ServerToClientEvents } from '@12tails/shar
 import { LocalPlayer } from '../entities/LocalPlayer';
 import { RemotePlayer } from '../entities/RemotePlayer';
 import { connectSocket, type GameSocket } from '../net/socket';
+import { ChatBubble } from '../ui/ChatBubble';
+import { ChatOverlay } from '../ui/ChatOverlay';
 
 interface WorldInit {
   characterId: string;
@@ -30,6 +32,8 @@ export class WorldScene extends Phaser.Scene {
   private remotes = new Map<string, RemotePlayer>();
   private sendAccum = 0;
   private lastSent: SentState | null = null;
+  private chat!: ChatOverlay;
+  private bubbles = new Map<string, ChatBubble>();
 
   constructor() {
     super('World');
@@ -72,6 +76,60 @@ export class WorldScene extends Phaser.Scene {
       .setDepth(1000);
 
     this.setupNetwork(init);
+    this.setupChat();
+  }
+
+  // ------------------------------------------------------------------ chat
+
+  private setupChat() {
+    const keyboard = this.input.keyboard!;
+    this.chat = new ChatOverlay({
+      onSend: (text) => this.socket.emit('chat:send', { text }),
+      onFocusChange: (focused) => {
+        // Freeze movement keys while typing; clear stuck key state both ways.
+        keyboard.resetKeys();
+        keyboard.enabled = !focused;
+      },
+    });
+
+    const onChat: ServerToClientEvents['chat:message'] = (m) => {
+      this.chat.addMessage(m);
+      this.showBubble(m.id, m.text);
+    };
+    this.socket.on('chat:message', onChat);
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.socket.off('chat:message', onChat);
+      for (const b of this.bubbles.values()) b.destroy();
+      this.bubbles.clear();
+      this.chat.destroy();
+      keyboard.enabled = true;
+    });
+  }
+
+  private showBubble(playerId: string, text: string) {
+    const isLocal = playerId === this.socket.id;
+    if (!isLocal && !this.remotes.has(playerId)) return; // speaker not visible
+
+    this.bubbles.get(playerId)?.destroy();
+    this.bubbles.set(playerId, new ChatBubble(this, text));
+  }
+
+  /** Anchor each live bubble just above its speaker's name tag. */
+  private updateBubbles() {
+    for (const [id, bubble] of this.bubbles) {
+      if (!bubble.active) {
+        this.bubbles.delete(id); // expired (BUBBLE_MS)
+        continue;
+      }
+      const target = id === this.socket.id ? this.player : this.remotes.get(id);
+      if (!target) {
+        bubble.destroy();
+        this.bubbles.delete(id);
+        continue;
+      }
+      bubble.setPosition(target.x, target.y - CONFIG.FRAME.H * 0.55 - 18);
+    }
   }
 
   // ------------------------------------------------------------ networking
@@ -177,6 +235,7 @@ export class WorldScene extends Phaser.Scene {
     this.player.update();
     this.nameTag.setPosition(this.player.x, this.player.y - CONFIG.FRAME.H * 0.55);
     for (const r of this.remotes.values()) r.update();
+    this.updateBubbles();
     this.sendMove(delta);
   }
 }

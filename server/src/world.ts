@@ -24,6 +24,10 @@ export class World {
     return p;
   }
 
+  get(id: string): PlayerState | undefined {
+    return this.players.get(id);
+  }
+
   remove(id: string): boolean {
     return this.players.delete(id);
   }

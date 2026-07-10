@@ -39,7 +39,7 @@ export class RemotePlayer extends Phaser.GameObjects.Sprite {
       .text(0, 0, state.name, {
         fontFamily: 'monospace',
         fontSize: '11px',
-        color: '#d8f2ff',
+        color: '#cfa3ff', // other players read purple in-game
         backgroundColor: '#00000066',
         padding: { x: 3, y: 1 },
       })

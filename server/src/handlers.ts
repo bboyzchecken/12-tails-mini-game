@@ -1,5 +1,6 @@
 import type { Server, Socket } from 'socket.io';
 import type {
+  ChatMessage,
   ClientToServerEvents,
   Direction,
   PlayerState,
@@ -30,7 +31,17 @@ function safeName(name: unknown): string {
   );
 }
 
-export function registerHandlers(_io: IO, socket: Sock) {
+/** Always sanitize chat on the server: strip HTML, collapse whitespace, cap length. */
+function sanitizeChat(raw: unknown): string {
+  return String(raw ?? '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/[<>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, CONFIG.CHAT_MAX_LEN);
+}
+
+export function registerHandlers(io: IO, socket: Sock) {
   socket.on('player:join', (p) => {
     const player: PlayerState = {
       id: socket.id,
@@ -63,6 +74,15 @@ export function registerHandlers(_io: IO, socket: Sock) {
       dir: updated.dir,
       moving: updated.moving,
     });
+  });
+
+  socket.on('chat:send', (p) => {
+    const player = world.get(socket.id);
+    if (!player) return; // must join before chatting
+    const text = sanitizeChat(p?.text);
+    if (!text) return; // whitespace-only / empty after sanitize — drop
+    const msg: ChatMessage = { id: socket.id, name: player.name, text, ts: Date.now() };
+    io.emit('chat:message', msg); // everyone, sender included (single render path)
   });
 
   socket.on('disconnect', () => {
