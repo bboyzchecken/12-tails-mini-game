@@ -6,7 +6,9 @@ import { PreloadScene } from './scenes/PreloadScene';
 import { CharacterSelectScene } from './scenes/CharacterSelectScene';
 import { WorldScene } from './scenes/WorldScene';
 import { mountDemoBanner } from './ui/store/DemoBanner';
-import { mountDevBusProbe } from './ui/DevBusProbe';
+import { mountControlHints } from './ui/hud/ControlHints';
+import { mountLocationTitle } from './ui/hud/LocationTitle';
+import { mountPlayerHUD } from './ui/hud/PlayerHUD';
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -39,8 +41,11 @@ if (import.meta.env.DEV) {
 // running client-only just logs a harmless connect warning.
 connectSocket();
 
-// DOM UI overlay (12tails-ui-roadmap.md): DEMO banner ค้างตลอด + bus probe (dev)
+// DOM UI overlay (12tails-ui-roadmap.md): DEMO banner ค้างตลอด + Core HUD (U1)
+// HUD ซ่อนตัวเองจนกว่าข้อมูลแรกจะไหลมาทาง bus (หลังเข้า WorldScene)
 mountDemoBanner();
-if (import.meta.env.DEV) mountDevBusProbe();
+mountLocationTitle();
+mountPlayerHUD();
+mountControlHints();
 
 console.log('[client] boot · TILE =', CONFIG.TILE);

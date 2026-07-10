@@ -91,36 +91,182 @@
   white-space: nowrap;
 }
 
-/* ---- Dev bus probe (ชั่วคราว — พิสูจน์ bus สองทาง, ถูกแทนด้วย HUD จริงใน U1) ---- */
-.bus-probe {
+/* ---- HUD (U1) — ทุกชิ้นซ่อนจนกว่าข้อมูลแรกจะมาจาก bus (เข้าโลกแล้ว) ---- */
+.hud-hidden {
+  display: none !important;
+}
+
+/* LocationTitle (บนซ้าย): ชื่อห้อง/แมพ + จำนวนออนไลน์ */
+.location-title {
   position: absolute;
-  top: 52px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 10px 14px;
-  min-width: 280px;
-  pointer-events: auto;
-  font-size: 0.92em;
+  top: 10px;
+  left: 10px;
+  padding: 7px 14px;
 }
-.bus-probe .probe-title {
+.location-title .loc-name {
   font-family: var(--font-head);
-  font-weight: 500;
-  margin-bottom: 4px;
+  font-weight: 600;
+  font-size: 1.08em;
 }
-.bus-probe .probe-row {
+.location-title .loc-online {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-.bus-probe .probe-row .k {
+  align-items: center;
+  gap: 6px;
+  margin-top: 1px;
+  font-size: 0.85em;
   color: var(--ui-muted);
 }
-.bus-probe .probe-status {
-  color: var(--ui-accent-2);
-  min-height: 1.2em;
+.location-title .loc-online .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ui-accent-2);
+}
+
+/* PlayerHUD (บนขวา): avatar · ชื่อ+เผ่า · Lv/XP · กระเป๋าเงิน (demo) */
+.player-hud {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 10px;
+  padding: 9px 12px;
+  width: 228px;
+}
+.player-hud .avatar {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 12px;
+  border: 2px solid var(--panel-line);
+  background: var(--panel-line);
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+.player-hud .col {
+  flex: 1;
+  min-width: 0;
+}
+.player-hud .name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.player-hud .p-name {
+  font-family: var(--font-head);
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.player-hud .p-tag {
+  flex: none;
+  font-size: 0.78em;
+  color: var(--ui-muted);
+  white-space: nowrap;
+}
+.player-hud .xp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-top: 4px;
 }
-.bus-probe .btn {
-  margin-top: 6px;
-  width: 100%;
+.player-hud .lv {
+  font-family: var(--font-head);
+  font-size: 0.78em;
+  font-weight: 600;
+  color: var(--ui-accent);
+  white-space: nowrap;
+}
+.player-hud .xp-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--panel-line);
+  overflow: hidden;
+}
+.player-hud .xp-fill {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--ui-accent);
+  transition: width 0.3s;
+}
+.player-hud .cur-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 5px;
+  font-size: 0.85em;
+}
+.player-hud .cur {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-head);
+  font-weight: 500;
+}
+.player-hud .cur svg {
+  width: 13px;
+  height: 13px;
+}
+.player-hud .cur-jil {
+  color: var(--ui-accent);
+}
+.player-hud .cur-coin {
+  color: var(--ui-muted);
+}
+
+/* ControlHints (ล่างขวา) */
+.control-hints {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 12px;
+  font-size: 0.85em;
+  color: var(--ui-muted);
+}
+.control-hints .hint {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.control-hints .key {
+  font-family: var(--font-head);
+  font-size: 0.9em;
+  color: var(--ui-ink);
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  padding: 0 6px;
+  min-width: 1.1em;
+  text-align: center;
+}
+
+/* มือถือ: DEMO banner ครองกลางบน — เลื่อน HUD ลงและย่อ;
+   hints ยกขึ้นพ้นแถว chat input (ล่างซ้าย) */
+@media (max-width: 640px) {
+  .location-title {
+    top: 46px;
+    left: 8px;
+    max-width: 38vw;
+  }
+  .player-hud {
+    top: 46px;
+    right: 8px;
+    width: 200px;
+  }
+  .player-hud .avatar {
+    width: 38px;
+    height: 38px;
+  }
+  .control-hints {
+    right: 8px;
+    bottom: 56px;
+    padding: 7px 10px;
+  }
 }

@@ -1,0 +1,86 @@
+import { getCharacter } from '../../manifest';
+import { gameToUI } from '../bus';
+import { uiRoot } from '../UIRoot';
+
+/* Lucide icons (ISC) — inline SVG ตาม guideline "icon เป็น SVG ไม่ใช่ emoji" */
+const ICON_GEM =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></svg>';
+const ICON_COINS =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/>' +
+  '<path d="m16.71 13.88.7.71-2.82 2.82"/></svg>';
+
+/**
+ * มุมบนขวา (U1): avatar จาก characterId, ชื่อ+tag (ตัวละคร·เผ่า),
+ * Lv + XP bar, กระเป๋าเงิน Jil/เหรียญ (ค่า demo — ห้ามแสดงเป็น ฿/$)
+ * ซ่อนจนกว่า player:self แรกจะมาถึง (= เข้าโลกแล้ว)
+ */
+export function mountPlayerHUD() {
+  const el = document.createElement('div');
+  el.className = 'panel player-hud hud-hidden';
+
+  const avatar = document.createElement('img');
+  avatar.className = 'avatar';
+  avatar.alt = '';
+
+  const col = document.createElement('div');
+  col.className = 'col';
+
+  const nameRow = document.createElement('div');
+  nameRow.className = 'name-row';
+  const name = document.createElement('span');
+  name.className = 'p-name';
+  const tag = document.createElement('span');
+  tag.className = 'p-tag';
+  nameRow.append(name, tag);
+
+  const xpRow = document.createElement('div');
+  xpRow.className = 'xp-row';
+  const lv = document.createElement('span');
+  lv.className = 'lv';
+  const xpBar = document.createElement('div');
+  xpBar.className = 'xp-bar';
+  const xpFill = document.createElement('div');
+  xpFill.className = 'xp-fill';
+  xpBar.appendChild(xpFill);
+  xpRow.append(lv, xpBar);
+
+  const curRow = document.createElement('div');
+  curRow.className = 'cur-row';
+  const jil = makeCurrency('cur-jil', ICON_GEM, 'Jil (demo — ไม่ใช่เงินจริง)');
+  const coins = makeCurrency('cur-coin', ICON_COINS, 'เหรียญ (demo)');
+  curRow.append(jil.el, coins.el);
+
+  col.append(nameRow, xpRow, curRow);
+  el.append(avatar, col);
+
+  gameToUI.on('player:self', (p) => {
+    const def = getCharacter(p.characterId);
+    if (def) avatar.src = def.thumb;
+    name.textContent = p.name;
+    tag.textContent = def ? `${def.name}·${def.tribe}` : p.characterId;
+    lv.textContent = `Lv.${p.level}`;
+    xpBar.title = `XP ${p.xp}/${p.xpMax}`;
+    xpFill.style.width = `${Math.max(0, Math.min(100, (p.xp / p.xpMax) * 100))}%`;
+    el.classList.remove('hud-hidden');
+  });
+
+  gameToUI.on('player:currency', (c) => {
+    jil.value.textContent = c.jil.toLocaleString('th-TH');
+    coins.value.textContent = c.coins.toLocaleString('th-TH');
+  });
+
+  uiRoot.mount(el);
+}
+
+function makeCurrency(cls: string, iconSvg: string, label: string) {
+  const el = document.createElement('span');
+  el.className = `cur ${cls}`;
+  el.title = label;
+  el.innerHTML = iconSvg; // static icon string — no user data
+  const value = document.createElement('span');
+  value.textContent = '0';
+  el.appendChild(value);
+  return { el, value };
+}

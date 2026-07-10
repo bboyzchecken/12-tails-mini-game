@@ -16,9 +16,11 @@ interface ChatOverlayOptions {
 
 /**
  * HTML chat UI over the canvas, styled after the game: a transparent
- * right-aligned message log at the bottom-right and an input box below it.
- * Enter focuses the input / sends; Esc cancels. All text is inserted with
- * textContent, so nothing the server relays can inject markup.
+ * message log at the bottom-left and an input box below it (ตำแหน่งตาม
+ * layout ใน 12tails-ui-roadmap.md §3 — ล่างขวาเป็นของ ControlHints;
+ * ตัวนี้ถูกแทนด้วย ChatPanel ใน U2). Enter focuses the input / sends;
+ * Esc cancels. All text is inserted with textContent, so nothing the
+ * server relays can inject markup.
  */
 export class ChatOverlay {
   private root: HTMLDivElement;
@@ -38,14 +40,15 @@ export class ChatOverlay {
       'font-family:Tahoma,"Leelawadee UI",sans-serif;';
 
     this.log = document.createElement('div');
+    // left:72px เว้นที่ให้ปุ่ม EmoteWheel ที่มุมล่างซ้าย (จะถูก restyle ใน U3)
     this.log.style.cssText =
-      'position:absolute;right:14px;bottom:52px;width:44%;max-width:540px;' +
-      'display:flex;flex-direction:column;align-items:flex-end;gap:2px;' +
+      'position:absolute;left:72px;bottom:52px;width:44%;max-width:540px;' +
+      'display:flex;flex-direction:column;align-items:flex-start;gap:2px;' +
       `font-size:13px;line-height:1.35;text-shadow:${TEXT_SHADOW};` +
       'user-select:none;';
 
     const inputWrap = document.createElement('div');
-    inputWrap.style.cssText = 'position:absolute;right:14px;bottom:14px;pointer-events:auto;';
+    inputWrap.style.cssText = 'position:absolute;left:72px;bottom:14px;pointer-events:auto;';
 
     this.input = document.createElement('input');
     this.input.maxLength = CONFIG.CHAT_MAX_LEN;
