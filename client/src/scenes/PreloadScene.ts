@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
 import { CONFIG } from '@12tails/shared/config';
+import { CHARACTERS } from '../manifest';
 
 /**
- * Loads the Phase 1 assets: the novice-camp tilemap, its tileset image, and
- * the placeholder character sheet. Phase 2 will expand this to load every
- * character from characters.json.
+ * Loads the map and every character listed in characters.json, then hands off
+ * to the character-select screen. Each character sheet is keyed by its id so
+ * later scenes can spawn it directly; thumbnails are keyed `<id>-thumb`.
  */
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -23,14 +24,17 @@ export class PreloadScene extends Phaser.Scene {
 
     this.load.tilemapTiledJSON('novice-camp', 'assets/maps/novice-camp.json');
     this.load.image('tiles', 'assets/maps/tileset.png');
-    this.load.spritesheet('novice', 'assets/characters/novice/sheet.png', {
-      frameWidth: CONFIG.FRAME.W,
-      frameHeight: CONFIG.FRAME.H,
-    });
+
+    for (const c of CHARACTERS) {
+      this.load.spritesheet(c.id, c.sheet, {
+        frameWidth: CONFIG.FRAME.W,
+        frameHeight: CONFIG.FRAME.H,
+      });
+      this.load.image(`${c.id}-thumb`, c.thumb);
+    }
   }
 
   create() {
-    // Phase 2 will replace these with the player's real selection.
-    this.scene.start('World', { characterId: 'novice', name: 'มือใหม่' });
+    this.scene.start('CharacterSelect');
   }
 }

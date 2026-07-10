@@ -3,6 +3,7 @@ import { CONFIG } from '@12tails/shared/config';
 import { connectSocket } from './net/socket';
 import { BootScene } from './scenes/BootScene';
 import { PreloadScene } from './scenes/PreloadScene';
+import { CharacterSelectScene } from './scenes/CharacterSelectScene';
 import { WorldScene } from './scenes/WorldScene';
 
 const game = new Phaser.Game({
@@ -14,11 +15,14 @@ const game = new Phaser.Game({
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
+  dom: {
+    createContainer: true, // enables HTML overlays (nickname input, chat later)
+  },
   physics: {
     default: 'arcade',
     arcade: { gravity: { x: 0, y: 0 }, debug: false },
   },
-  scene: [BootScene, PreloadScene, WorldScene],
+  scene: [BootScene, PreloadScene, CharacterSelectScene, WorldScene],
 });
 
 // Handy for debugging in the dev console; stripped from production builds.

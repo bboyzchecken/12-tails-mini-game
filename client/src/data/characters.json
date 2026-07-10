@@ -1,0 +1,36 @@
+{
+  "frame": {
+    "w": 64,
+    "h": 64,
+    "cols": 5,
+    "rows": 4,
+    "rowOrder": ["down", "up", "left", "right"],
+    "idleCol": 0,
+    "walkCols": [1, 2, 3, 4]
+  },
+  "face": {
+    "w": 96,
+    "h": 96,
+    "emotes": ["neutral", "happy", "angry", "sad", "surprised", "laugh", "cry", "love"]
+  },
+  "characters": [
+    {
+      "id": "dog",
+      "name": "หมา",
+      "tribe": "นักรบ",
+      "color": "#C8A165",
+      "sheet": "assets/characters/dog/sheet.png",
+      "faces": "assets/characters/dog/faces.png",
+      "thumb": "assets/characters/dog/thumb.png"
+    },
+    {
+      "id": "sheep",
+      "name": "แกะ",
+      "tribe": "นักบวช",
+      "color": "#B9B2A8",
+      "sheet": "assets/characters/sheep/sheet.png",
+      "faces": "assets/characters/sheep/faces.png",
+      "thumb": "assets/characters/sheep/thumb.png"
+    }
+  ]
+}

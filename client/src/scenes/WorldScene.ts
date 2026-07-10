@@ -13,6 +13,7 @@ interface WorldInit {
  */
 export class WorldScene extends Phaser.Scene {
   private player!: LocalPlayer;
+  private nameTag!: Phaser.GameObjects.Text;
 
   constructor() {
     super('World');
@@ -44,7 +45,7 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.roundPixels = true;
 
     // Small name tag above the player (full presence UI comes in Phase 3).
-    const tag = this.add
+    this.nameTag = this.add
       .text(0, 0, init.name, {
         fontFamily: 'monospace',
         fontSize: '11px',
@@ -54,12 +55,10 @@ export class WorldScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 1)
       .setDepth(1000);
-    this.events.on(Phaser.Scenes.Events.UPDATE, () => {
-      tag.setPosition(this.player.x, this.player.y - CONFIG.FRAME.H * 0.55);
-    });
   }
 
   update() {
     this.player.update();
+    this.nameTag.setPosition(this.player.x, this.player.y - CONFIG.FRAME.H * 0.55);
   }
 }
