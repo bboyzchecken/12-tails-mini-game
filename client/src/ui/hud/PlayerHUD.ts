@@ -12,17 +12,23 @@ const ICON_COINS =
   '<path d="m16.71 13.88.7.71-2.82 2.82"/></svg>';
 
 /**
- * มุมบนขวา (U1): avatar จาก characterId, ชื่อ+tag (ตัวละคร·เผ่า),
- * Lv + XP bar, กระเป๋าเงิน Jil/เหรียญ (ค่า demo — ห้ามแสดงเป็น ฿/$)
+ * มุมล่างซ้าย (U1 — ตำแหน่งตาม UI เกมจริง): portrait วงกลม + Lv badge,
+ * ชื่อ+tag (ตัวละคร·เผ่า), XP bar มีตัวเลข, กระเป๋าเงิน Jil/เหรียญ
+ * (ค่า demo — ห้ามแสดงเป็น ฿/$)
  * ซ่อนจนกว่า player:self แรกจะมาถึง (= เข้าโลกแล้ว)
  */
 export function mountPlayerHUD() {
   const el = document.createElement('div');
   el.className = 'panel player-hud hud-hidden';
 
+  const avatarWrap = document.createElement('div');
+  avatarWrap.className = 'avatar-wrap';
   const avatar = document.createElement('img');
   avatar.className = 'avatar';
   avatar.alt = '';
+  const lvBadge = document.createElement('span');
+  lvBadge.className = 'lv-badge';
+  avatarWrap.append(avatar, lvBadge);
 
   const col = document.createElement('div');
   col.className = 'col';
@@ -35,16 +41,13 @@ export function mountPlayerHUD() {
   tag.className = 'p-tag';
   nameRow.append(name, tag);
 
-  const xpRow = document.createElement('div');
-  xpRow.className = 'xp-row';
-  const lv = document.createElement('span');
-  lv.className = 'lv';
   const xpBar = document.createElement('div');
   xpBar.className = 'xp-bar';
   const xpFill = document.createElement('div');
   xpFill.className = 'xp-fill';
-  xpBar.appendChild(xpFill);
-  xpRow.append(lv, xpBar);
+  const xpText = document.createElement('span');
+  xpText.className = 'xp-text';
+  xpBar.append(xpFill, xpText);
 
   const curRow = document.createElement('div');
   curRow.className = 'cur-row';
@@ -52,16 +55,17 @@ export function mountPlayerHUD() {
   const coins = makeCurrency('cur-coin', ICON_COINS, 'เหรียญ (demo)');
   curRow.append(jil.el, coins.el);
 
-  col.append(nameRow, xpRow, curRow);
-  el.append(avatar, col);
+  col.append(nameRow, xpBar, curRow);
+  el.append(avatarWrap, col);
 
   gameToUI.on('player:self', (p) => {
     const def = getCharacter(p.characterId);
     if (def) avatar.src = def.thumb;
     name.textContent = p.name;
     tag.textContent = def ? `${def.name}·${def.tribe}` : p.characterId;
-    lv.textContent = `Lv.${p.level}`;
+    lvBadge.textContent = `Lv.${p.level}`;
     xpBar.title = `XP ${p.xp}/${p.xpMax}`;
+    xpText.textContent = `${p.xp}/${p.xpMax}`;
     xpFill.style.width = `${Math.max(0, Math.min(100, (p.xp / p.xpMax) * 100))}%`;
     el.classList.remove('hud-hidden');
   });

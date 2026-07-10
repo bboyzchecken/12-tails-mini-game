@@ -96,12 +96,30 @@
   display: none !important;
 }
 
-/* LocationTitle (บนซ้าย): ชื่อห้อง/แมพ + จำนวนออนไลน์ */
+/* LocationTitle (บนซ้าย): ป้ายแมพแบบเกม — icon เข็มทิศ + ชื่อแมพ + ออนไลน์ */
 .location-title {
   position: absolute;
   top: 10px;
   left: 10px;
-  padding: 7px 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 14px 6px 8px;
+}
+.location-title .loc-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ui-accent-2);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.location-title .loc-icon svg {
+  width: 19px;
+  height: 19px;
 }
 .location-title .loc-name {
   font-family: var(--font-head);
@@ -123,25 +141,45 @@
   background: var(--ui-accent-2);
 }
 
-/* PlayerHUD (บนขวา): avatar · ชื่อ+เผ่า · Lv/XP · กระเป๋าเงิน (demo) */
+/* PlayerHUD (ล่างซ้าย — ตำแหน่งเดียวกับเกมจริง):
+   portrait วงกลม + Lv badge · ชื่อ+เผ่า · XP bar มีตัวเลข · กระเป๋าเงิน (demo) */
 .player-hud {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  left: 10px;
+  bottom: 10px;
   display: flex;
-  gap: 10px;
-  padding: 9px 12px;
-  width: 228px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px 10px 10px;
+  width: 258px;
+}
+.player-hud .avatar-wrap {
+  position: relative;
+  flex: none;
 }
 .player-hud .avatar {
-  width: 46px;
-  height: 46px;
-  flex: none;
-  border-radius: 12px;
-  border: 2px solid var(--panel-line);
+  display: block;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid var(--ui-accent);
   background: var(--panel-line);
   object-fit: cover;
   image-rendering: pixelated;
+}
+.player-hud .lv-badge {
+  position: absolute;
+  right: -6px;
+  bottom: -2px;
+  font-family: var(--font-head);
+  font-size: 0.72em;
+  font-weight: 600;
+  color: #fff;
+  background: var(--ui-accent);
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 2px solid var(--panel);
+  white-space: nowrap;
 }
 .player-hud .col {
   flex: 1;
@@ -165,22 +203,10 @@
   color: var(--ui-muted);
   white-space: nowrap;
 }
-.player-hud .xp-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-}
-.player-hud .lv {
-  font-family: var(--font-head);
-  font-size: 0.78em;
-  font-weight: 600;
-  color: var(--ui-accent);
-  white-space: nowrap;
-}
 .player-hud .xp-bar {
-  flex: 1;
-  height: 8px;
+  position: relative;
+  height: 15px;
+  margin-top: 5px;
   border-radius: 999px;
   background: var(--panel-line);
   overflow: hidden;
@@ -191,6 +217,17 @@
   border-radius: inherit;
   background: var(--ui-accent);
   transition: width 0.3s;
+}
+.player-hud .xp-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-head);
+  font-size: 0.7em;
+  color: var(--ui-ink);
+  text-shadow: 0 0 3px var(--panel);
 }
 .player-hud .cur-row {
   display: flex;
@@ -214,6 +251,28 @@
 }
 .player-hud .cur-coin {
   color: var(--ui-muted);
+}
+
+/* Chat overlay (ชั่วคราวจนถึง U2): log + input ซ้อนเหนือ PlayerHUD ฝั่งซ้าย */
+.chat-log {
+  position: absolute;
+  left: 14px;
+  bottom: 156px;
+  width: 44%;
+  max-width: 540px;
+}
+.chat-input-wrap {
+  position: absolute;
+  left: 14px;
+  bottom: 118px;
+  pointer-events: auto;
+}
+
+/* ปุ่ม EmoteWheel: ขวาของ PlayerHUD (จะกลายเป็นส่วนของ ActionBar ใน U4) */
+.emote-btn {
+  position: absolute;
+  left: 308px;
+  bottom: 18px;
 }
 
 /* ControlHints (ล่างขวา) */
@@ -247,26 +306,43 @@
   text-align: center;
 }
 
-/* มือถือ: DEMO banner ครองกลางบน — เลื่อน HUD ลงและย่อ;
-   hints ยกขึ้นพ้นแถว chat input (ล่างซ้าย) */
+/* มือถือ: DEMO banner ครองกลางบน — เลื่อนป้ายแมพลง, ย่อ PlayerHUD,
+   ปุ่ม emote ชิด HUD, chat/hints ขยับพ้นกัน */
 @media (max-width: 640px) {
   .location-title {
     top: 46px;
     left: 8px;
-    max-width: 38vw;
+    max-width: 60vw;
   }
   .player-hud {
-    top: 46px;
-    right: 8px;
-    width: 200px;
+    left: 8px;
+    bottom: 8px;
+    width: 206px;
+    gap: 9px;
+    padding: 8px 12px 8px 8px;
   }
   .player-hud .avatar {
-    width: 38px;
-    height: 38px;
+    width: 48px;
+    height: 48px;
   }
+  .emote-btn {
+    left: 246px;
+    bottom: 12px;
+  }
+  .chat-log {
+    left: 8px;
+    bottom: 134px;
+    width: 70vw;
+  }
+  .chat-input-wrap {
+    left: 8px;
+    bottom: 96px;
+  }
+  /* บนขวาว่างหลังย้าย PlayerHUD ลงล่าง — พ้นคอลัมน์แชท/HUD ฝั่งซ้ายล่าง */
   .control-hints {
     right: 8px;
-    bottom: 56px;
+    top: 46px;
+    bottom: auto;
     padding: 7px 10px;
   }
 }
