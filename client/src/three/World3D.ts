@@ -657,17 +657,14 @@ export class World3D {
       if (slot === 'weapon') player.setEquipment('weaponL', null);
       return;
     }
-    const align = slot === 'weapon';
-    const obj = await loadEquipment(equipmentUrl(hero, slot, id), { alignLongAxis: align });
+    const obj = await loadEquipment(equipmentUrl(hero, slot, id));
     player.setEquipment(slot, obj);
 
     // Dual-wield heroes ship paired weapons (nameR / name_r) — equip the
     // off-hand half automatically when the pair exists.
     if (slot === 'weapon') {
       const partner = await weaponPartner(hero, id);
-      const off = partner
-        ? await loadEquipment(equipmentUrl(hero, 'weapon', partner), { alignLongAxis: true })
-        : null;
+      const off = partner ? await loadEquipment(equipmentUrl(hero, 'weapon', partner)) : null;
       player.setEquipment('weaponL', off);
     }
   }

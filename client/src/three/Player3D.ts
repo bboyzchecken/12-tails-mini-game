@@ -131,9 +131,13 @@ abstract class PlayerBase {
   }
 
   private findBone(name: string): THREE.Object3D | null {
+    // Case-insensitive: rigs disagree on casing (mount_Overhead vs mount_OverHead).
+    // First match wins — the grafted costume skeleton adds `_1` duplicates and the
+    // primary (un-suffixed) bone comes first in traversal order.
+    const want = name.toLowerCase();
     let found: THREE.Object3D | null = null;
     this.group.traverse((o) => {
-      if (!found && o.name === name) found = o;
+      if (!found && o.name.toLowerCase() === want) found = o;
     });
     return found;
   }
