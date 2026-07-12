@@ -91,12 +91,11 @@ export class CharacterPreview {
   private frame(obj: THREE.Object3D) {
     obj.position.set(0, 0, 0);
     obj.rotation.y = 0;
-    const box = new THREE.Box3().setFromObject(obj);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    const h = Math.max(size.y, 1);
-    this.camera.position.set(0, center.y + h * 0.1, h * 2.4);
-    this.camera.lookAt(0, center.y, 0);
+    // The ripped skinned mesh's bind-pose bounding box is unreliable (authored
+    // small, scaled up by bone matrices), so Box3 zooms in on the legs. Use a
+    // fixed frame — all heroes are chibi ~1.6–2.4 units tall standing at y=0.
+    this.camera.position.set(0, 1.1, 4.6);
+    this.camera.lookAt(0, 1.0, 0);
   }
 
   private tick() {

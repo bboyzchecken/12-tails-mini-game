@@ -58,8 +58,8 @@ const MAP_VARIANTS: Record<MapVariant, MapVariantDef> = {
   },
 };
 
-/** เริ่มที่กลางคืน — ตามที่เจ้าของโปรเจกต์ชอบ 🌙 */
-const DEFAULT_MAP_VARIANT: MapVariant = 'night';
+/** เริ่มที่กลางวันเป็น default (สลับเป็นกลางคืนได้ด้วยปุ่ม 🌙/☀️) */
+const DEFAULT_MAP_VARIANT: MapVariant = 'day';
 
 /** In dev, force-fresh fetches — re-exported maps/masks must never come from cache. */
 function bust(url: string): string {
