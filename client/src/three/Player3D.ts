@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { CONFIG } from '@12tails/shared/config';
 import type { Direction, PlayerState } from '@12tails/shared/events';
 import { instantiateCharacter, type CharacterAsset, type CharacterInstance } from './CharacterAsset';
-import { MOUNT_BONE, type EquipSlot } from './EquipmentLoader';
+import { MOUNT_PATTERNS, ITEM_OUT_AXIS, type EquipSlot } from './EquipmentLoader';
+
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
 /** Server keeps 2D pixel coords (x right, y down). 3D maps px → tiles: x→x, y→z. */
 export const PX_TO_UNIT = 1 / CONFIG.TILE;
@@ -121,25 +123,41 @@ abstract class PlayerBase {
       this.equipped.delete(slot);
     }
     if (!obj) return;
-    const bone = this.findBone(MOUNT_BONE[slot]);
+    const bone = this.findBone(MOUNT_PATTERNS[slot]);
     if (!bone) {
-      console.warn(`[player] mount bone '${MOUNT_BONE[slot]}' not found`);
+      console.warn(`[player] mount bone for '${slot}' not found on this rig`);
       return;
     }
     bone.add(obj);
+    this.orientEquipment(obj, bone);
     this.equipped.set(slot, obj);
   }
 
-  private findBone(name: string): THREE.Object3D | null {
-    // Case-insensitive: rigs disagree on casing (mount_Overhead vs mount_OverHead).
-    // First match wins — the grafted costume skeleton adds `_1` duplicates and the
-    // primary (un-suffixed) bone comes first in traversal order.
-    const want = name.toLowerCase();
-    let found: THREE.Object3D | null = null;
-    this.group.traverse((o) => {
-      if (!found && o.name.toLowerCase() === want) found = o;
-    });
-    return found;
+  /**
+   * Every item is authored with its bulk along the raw mesh +Z. Point that axis
+   * at world-up so weapons stand up out of the fist and hats sit on the crown —
+   * independent of each rig's mount-bone axes (hand +Z is forward, head +X is
+   * up, panda/rabbit differ again). Computed once from the current bone pose, so
+   * the item then rides the animation naturally.
+   */
+  private orientEquipment(obj: THREE.Object3D, bone: THREE.Object3D) {
+    bone.updateWorldMatrix(true, false);
+    const boneQ = bone.getWorldQuaternion(new THREE.Quaternion());
+    const localUp = WORLD_UP.clone().applyQuaternion(boneQ.invert()).normalize();
+    obj.quaternion.setFromUnitVectors(ITEM_OUT_AXIS, localUp);
+  }
+
+  private findBone(patterns: RegExp[]): THREE.Object3D | null {
+    // Patterns are tried in priority order; within a pattern, first match wins
+    // (the `$` anchors already exclude the grafted `_1` duplicate bones).
+    for (const re of patterns) {
+      let found: THREE.Object3D | null = null;
+      this.group.traverse((o) => {
+        if (!found && re.test(o.name)) found = o;
+      });
+      if (found) return found;
+    }
+    return null;
   }
 
   get headPos(): THREE.Vector3 {

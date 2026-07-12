@@ -17,7 +17,7 @@ import { LoadingBar } from '../ui/LoadingBar';
 import { loadCharacterAsset, buildAppearanceTexture, type CharacterAsset } from './CharacterAsset';
 import { loadEquipment, equipmentUrl, type EquipSlot } from './EquipmentLoader';
 import { trimClips } from './CharacterAsset';
-import { weaponPartner } from '../ui/equipmentIndex';
+import { dualWieldHands } from '../ui/equipmentIndex';
 import { LocalPlayer3D, RemotePlayer3D, PX_TO_UNIT } from './Player3D';
 import { OverheadLayer } from './Overhead';
 
@@ -657,16 +657,19 @@ export class World3D {
       if (slot === 'weapon') player.setEquipment('weaponL', null);
       return;
     }
-    const obj = await loadEquipment(equipmentUrl(hero, slot, id));
-    player.setEquipment(slot, obj);
-
-    // Dual-wield heroes ship paired weapons (nameR / name_r) — equip the
-    // off-hand half automatically when the pair exists.
-    if (slot === 'weapon') {
-      const partner = await weaponPartner(hero, id);
-      const off = partner ? await loadEquipment(equipmentUrl(hero, 'weapon', partner)) : null;
-      player.setEquipment('weaponL', off);
+    if (slot !== 'weapon') {
+      player.setEquipment(slot, await loadEquipment(equipmentUrl(hero, slot, id)));
+      return;
     }
+
+    // Weapons: single-wield by default. Dual-wield heroes (wolf) also fill the
+    // off-hand — with the `_l` half of an explicit pair, else the same mesh.
+    const { right, left } = await dualWieldHands(hero, id);
+    player.setEquipment('weapon', await loadEquipment(equipmentUrl(hero, 'weapon', right)));
+    player.setEquipment(
+      'weaponL',
+      left ? await loadEquipment(equipmentUrl(hero, 'weapon', left)) : null,
+    );
   }
 
   /** Local player changed their look (from the customize panel): apply + broadcast. */

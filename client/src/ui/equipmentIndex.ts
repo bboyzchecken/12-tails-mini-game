@@ -3,10 +3,13 @@
  * each hero has). Slot lists are the glb basenames = the ids stored in
  * Appearance.weapon / Appearance.hat.
  *
- * UI lists are CLEANED here so every surface agrees:
- *  - off-hand halves of dual-wield pairs (nameR / name_r) are hidden — they
- *    equip automatically with their base weapon. Hats keep their R/V suffixes:
- *    those are color variants (partyHatB/partyHatR), not off-hands.
+ * Suffix meaning (verified against the ripped meshes):
+ *  - `_l` / `_r` = a genuine left/right dual-wield PAIR (identical vert counts,
+ *    e.g. hallowSaw_l/hallowSaw_r). The `_r` half is hidden from lists; it
+ *    equips automatically on the off-hand of a dual-wield hero.
+ *  - `R` / `V` (capital) = recolor/tier variants of the SAME mesh (heroSword,
+ *    heroSwordR, heroSwordV are byte-identical geometry). These are distinct
+ *    skins the player can pick — they are NOT off-hands and stay in the list.
  */
 export interface HeroEquipment {
   weapon: string[];
@@ -14,6 +17,9 @@ export interface HeroEquipment {
 }
 
 type EquipmentIndex = Record<string, HeroEquipment>;
+
+/** Heroes that hold a weapon in both hands. Everyone else is single-wield. */
+export const DUAL_WIELD = new Set(['wolf']);
 
 let cache: Promise<EquipmentIndex> | null = null;
 
@@ -24,30 +30,36 @@ function load(): Promise<EquipmentIndex> {
   return cache;
 }
 
-function isOffhand(name: string, list: string[]): boolean {
-  if (name.endsWith('_r') && list.includes(`${name.slice(0, -2)}_l`)) return true;
-  if (/R$/.test(name) && list.includes(name.slice(0, -1))) return true;
-  return false;
+/** The `_r` half of an explicit `_l`/`_r` dual-wield pair. */
+function isOffhandHalf(name: string, list: string[]): boolean {
+  return name.endsWith('_r') && list.includes(`${name.slice(0, -2)}_l`);
 }
 
 /** Cleaned lists for UI (shop/customize). */
 export async function getHeroEquipment(hero: string): Promise<HeroEquipment> {
   const raw = (await load())[hero] ?? { weapon: [], hat: [] };
   return {
-    weapon: raw.weapon.filter((w) => !isOffhand(w, raw.weapon)),
+    weapon: raw.weapon.filter((w) => !isOffhandHalf(w, raw.weapon)),
     hat: raw.hat,
   };
 }
 
-/** The off-hand counterpart of a weapon (dual-wield pair), if the hero has one. */
-export async function weaponPartner(hero: string, id: string): Promise<string | null> {
-  const raw = (await load())[hero] ?? { weapon: [], hat: [] };
-  const list = raw.weapon;
-  if (list.includes(`${id}R`)) return `${id}R`;
-  if (list.includes(`${id}_r`)) return `${id}_r`;
-  if (id.endsWith('_l')) {
-    const p = `${id.slice(0, -2)}_r`;
-    if (list.includes(p)) return p;
+/**
+ * For a dual-wield hero, resolve which mesh goes in each hand for the chosen
+ * weapon id. Explicit `_l`/`_r` pairs split across the hands; anything else is
+ * held in duplicate (the left mount bone is already mirrored, so one mesh does).
+ */
+export async function dualWieldHands(
+  hero: string,
+  id: string,
+): Promise<{ right: string; left: string | null }> {
+  if (!DUAL_WIELD.has(hero)) return { right: id, left: null };
+  const list = ((await load())[hero] ?? { weapon: [] }).weapon;
+  if (id.endsWith('_l') && list.includes(`${id.slice(0, -2)}_r`)) {
+    return { right: `${id.slice(0, -2)}_r`, left: id };
   }
-  return null;
+  if (id.endsWith('_r') && list.includes(`${id.slice(0, -2)}_l`)) {
+    return { right: id, left: `${id.slice(0, -2)}_l` };
+  }
+  return { right: id, left: id };
 }
