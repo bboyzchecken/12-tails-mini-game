@@ -8,6 +8,7 @@ import { gameToUI, uiToGame } from '../ui/bus';
 import { ChatOverlay } from '../ui/ChatOverlay';
 import { EmotePanel } from '../ui/EmotePanel';
 import { CustomizePanel } from '../ui/CustomizePanel';
+import { VirtualJoystick } from '../ui/VirtualJoystick';
 import { StoreModal } from '../ui/store/StoreModal';
 import { demoStore } from '../ui/store/demoState';
 import type { AppearanceControl } from '../ui/appearanceControl';
@@ -139,8 +140,10 @@ export class World3D {
   private camYaw = 0;
   private camPitch = 0.82;
   private camDist = 11;
-  private dragging = false;
-  private lastPointer = { x: 0, y: 0 };
+  // Active camera-drag pointers (multi-touch: 1 = rotate, 2 = pinch-zoom).
+  private camPointers = new Map<number, { x: number; y: number }>();
+  private pinchDist = 0;
+  private joystick?: VirtualJoystick;
   private sendAccum = 0;
   private lastSent: SentState | null = null;
 
@@ -442,6 +445,19 @@ export class World3D {
     );
   }
 
+  private pointerSpread(): number {
+    const pts = [...this.camPointers.values()];
+    if (pts.length < 2) return 0;
+    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  }
+
+  private zoomBy(delta: number) {
+    this.camDist = Math.min(
+      CAM_DIST_MAX,
+      Math.max(CAM_DIST_MIN, this.camDist * (1 + delta * CAM_ZOOM_SPEED)),
+    );
+  }
+
   // ---------------------------------------------------------------- input
 
   private setupInput() {
@@ -449,33 +465,54 @@ export class World3D {
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear());
 
-    // Drag to orbit the camera, wheel to zoom.
+    // Camera: 1 pointer drags to orbit, 2 pointers pinch to zoom (touch),
+    // wheel zooms (mouse). Touches that start on a UI element (joystick,
+    // buttons) never reach the canvas, so movement + camera don't fight.
     const canvas = this.renderer.domElement;
     canvas.style.touchAction = 'none';
     canvas.addEventListener('pointerdown', (e) => {
-      this.dragging = true;
-      this.lastPointer = { x: e.clientX, y: e.clientY };
-      canvas.setPointerCapture(e.pointerId);
+      this.camPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.camPointers.size === 2) this.pinchDist = this.pointerSpread();
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* stale/synthetic id */ }
     });
     canvas.addEventListener('pointermove', (e) => {
-      if (!this.dragging) return;
-      this.camYaw -= (e.clientX - this.lastPointer.x) * CAM_ROTATE_SPEED;
+      const prev = this.camPointers.get(e.pointerId);
+      if (!prev) return;
+      if (this.camPointers.size >= 2) {
+        this.camPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const spread = this.pointerSpread();
+        if (this.pinchDist > 0) {
+          this.zoomBy((this.pinchDist - spread) * 2); // pinch in = zoom in
+        }
+        this.pinchDist = spread;
+        return;
+      }
+      this.camYaw -= (e.clientX - prev.x) * CAM_ROTATE_SPEED;
       this.camPitch = Math.min(
         CAM_PITCH_MAX,
-        Math.max(CAM_PITCH_MIN, this.camPitch + (e.clientY - this.lastPointer.y) * CAM_ROTATE_SPEED),
+        Math.max(CAM_PITCH_MIN, this.camPitch + (e.clientY - prev.y) * CAM_ROTATE_SPEED),
       );
-      this.lastPointer = { x: e.clientX, y: e.clientY };
+      this.camPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     });
-    const endDrag = () => (this.dragging = false);
-    canvas.addEventListener('pointerup', endDrag);
-    canvas.addEventListener('pointercancel', endDrag);
+    const endPointer = (e: PointerEvent) => {
+      this.camPointers.delete(e.pointerId);
+      this.pinchDist = 0;
+    };
+    canvas.addEventListener('pointerup', endPointer);
+    canvas.addEventListener('pointercancel', endPointer);
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      this.camDist = Math.min(
-        CAM_DIST_MAX,
-        Math.max(CAM_DIST_MIN, this.camDist * (1 + e.deltaY * CAM_ZOOM_SPEED)),
-      );
+      this.zoomBy(e.deltaY);
     }, { passive: false });
+
+    // Touch devices get an on-screen movement stick (no keyboard); a body
+    // class lets the CSS reflow the HUD to keep the bottom-left corner clear.
+    // `?touch` forces it on for testing the mobile layout on desktop.
+    const touch = matchMedia('(pointer: coarse)').matches || location.search.includes('touch');
+    if (touch) {
+      document.body.classList.add('touch');
+      this.joystick = new VirtualJoystick();
+    }
 
     // Dev aid: press P to print where you stand — walk to a good spot, send the
     // numbers, and CONFIG.SPAWN gets pinned there.
@@ -493,6 +530,12 @@ export class World3D {
   private readMoveInput() {
     this.moveInput.set(0, 0);
     if (!this.inputEnabled) return;
+    // Touch joystick takes priority when pushed past a small deadzone.
+    const j = this.joystick?.vector;
+    if (j && Math.hypot(j.x, j.y) > 0.2) {
+      this.moveInput.set(j.x, j.y);
+      return;
+    }
     if (this.keys.has('ArrowLeft') || this.keys.has('KeyA')) this.moveInput.x -= 1;
     if (this.keys.has('ArrowRight') || this.keys.has('KeyD')) this.moveInput.x += 1;
     if (this.keys.has('ArrowUp') || this.keys.has('KeyW')) this.moveInput.y -= 1;

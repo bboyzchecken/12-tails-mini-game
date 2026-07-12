@@ -704,3 +704,68 @@
   background: #cbb9a4;
   cursor: default;
 }
+
+/* ── Mobile: virtual joystick + touch reflow ────────────────────────────── */
+.vjoy {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 12;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  background: rgba(20, 18, 30, 0.26);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  pointer-events: auto;
+}
+.vjoy-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  will-change: transform;
+}
+
+/* When the joystick is present (touch), keep the bottom-left corner clear:
+   HUD to top-left, emote button bottom-right, chat between, no key hints. */
+body.touch .location-title {
+  top: 8px;
+  left: 8px;
+  max-width: 52vw;
+}
+body.touch .player-hud {
+  top: 64px;
+  left: 8px;
+  bottom: auto;
+  width: 200px;
+}
+body.touch .control-hints {
+  display: none;
+}
+body.touch .emote-btn {
+  left: auto;
+  right: 12px;
+  bottom: 16px;
+}
+body.touch .chat-log {
+  left: 136px;
+  right: 72px;
+  width: auto;
+  bottom: 84px;
+}
+body.touch .chat-input-wrap {
+  left: 136px;
+  right: 72px;
+  bottom: 20px;
+  transform: none;
+  width: auto;
+}
+body.touch .chat-input-wrap input {
+  width: 100% !important;
+  min-width: 0;
+}
