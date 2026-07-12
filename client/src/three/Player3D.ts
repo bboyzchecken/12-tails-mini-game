@@ -4,6 +4,20 @@ import type { Direction, PlayerState } from '@12tails/shared/events';
 import { instantiateCharacter, type CharacterAsset, type CharacterInstance } from './CharacterAsset';
 import { mountPatterns, type EquipSlot } from './EquipmentLoader';
 
+/**
+ * Wolf is the reference rig — its weapons/hats are authored to sit correctly.
+ * Other rigs orient their mount bones differently (cat's hand +Z points down,
+ * wolf's points forward), so the same baked item pose lands wrong on them. These
+ * are wolf's mount-bone orientations RELATIVE TO ITS BODY; at attach time we
+ * rotate each hero's item by `heroBone_body⁻¹ · wolfBone_body` so the grip/hat
+ * matches wolf's on every character. Wolf itself gets identity (unchanged).
+ */
+const WOLF_REF: Record<EquipSlot, THREE.Quaternion> = {
+  weapon: new THREE.Quaternion(-0.10554, -0.04083, 0.92664, -0.35852),
+  weaponL: new THREE.Quaternion(0.02453, 0.0634, -0.36, 0.93047),
+  hat: new THREE.Quaternion(-0.49374, -0.50618, 0.49374, 0.50618),
+};
+
 /** Server keeps 2D pixel coords (x right, y down). 3D maps px → tiles: x→x, y→z. */
 export const PX_TO_UNIT = 1 / CONFIG.TILE;
 /** Fallback bubble height when a skeleton can't be measured. */
@@ -128,16 +142,24 @@ abstract class PlayerBase {
       console.warn(`[player] mount bone for '${slot}' not found on this rig`);
       return;
     }
-    // Wrapper stays identity; the item's own node keeps its baked pose. Only the
-    // showcase translation was stripped at load, so this seats grip/crown on the
-    // bone exactly as Unity parented it. `mirror` flips the off-hand copy (scale
-    // −Y) so a dual-wielder's reused main-hand mesh sits symmetrically on the
-    // mirrored left bone instead of pointing the opposite way.
+    // Normalize this rig's mount-bone orientation to wolf's so the item's baked
+    // pose lands the same way on every character. `mirror` flips the off-hand
+    // copy (scale −Y) so a dual-wielder's reused main-hand mesh sits
+    // symmetrically on the mirrored left bone instead of pointing the wrong way.
     obj.position.set(0, 0, 0);
-    obj.quaternion.identity();
+    obj.quaternion.copy(this.boneCorrection(bone, slot));
     obj.scale.set(1, mirror ? -1 : 1, 1);
     bone.add(obj);
     this.equipped.set(slot, obj);
+  }
+
+  /** Rotation that makes `bone` present the item as wolf's equivalent bone does. */
+  private boneCorrection(bone: THREE.Object3D, slot: EquipSlot): THREE.Quaternion {
+    this.group.updateWorldMatrix(true, false);
+    const groupQ = this.group.getWorldQuaternion(new THREE.Quaternion());
+    const boneQ = bone.getWorldQuaternion(new THREE.Quaternion());
+    const boneBody = groupQ.invert().multiply(boneQ); // hero bone relative to body
+    return boneBody.invert().multiply(WOLF_REF[slot]);
   }
 
   private findBone(patterns: RegExp[]): THREE.Object3D | null {
