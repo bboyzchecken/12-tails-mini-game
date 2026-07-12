@@ -1,4 +1,4 @@
-import type { PlayerState } from '@12tails/shared/events';
+import type { Appearance, PlayerState } from '@12tails/shared/events';
 
 /**
  * In-memory world state. The server is a relay, not a physics authority:
@@ -21,6 +21,13 @@ export class World {
     p.y = patch.y;
     p.dir = patch.dir;
     p.moving = patch.moving;
+    return p;
+  }
+
+  setAppearance(id: string, appearance: Appearance): PlayerState | undefined {
+    const p = this.players.get(id);
+    if (!p) return undefined;
+    p.appearance = appearance;
     return p;
   }
 

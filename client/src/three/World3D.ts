@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CONFIG } from '@12tails/shared/config';
-import type { PlayerState, ServerToClientEvents } from '@12tails/shared/events';
+import type { Appearance, PlayerState, ServerToClientEvents } from '@12tails/shared/events';
 import { connectSocket, type GameSocket } from '../net/socket';
 import { CHARACTERS, getCharacter, type CharacterDef } from '../manifest';
 import { gameToUI, uiToGame } from '../ui/bus';
 import { ChatOverlay } from '../ui/ChatOverlay';
 import { EmotePanel } from '../ui/EmotePanel';
+import { CustomizePanel } from '../ui/CustomizePanel';
 import { DayNightToggle, type MapVariant } from '../ui/DayNightToggle';
 import { LoadingBar } from '../ui/LoadingBar';
-import { loadCharacterAsset, type CharacterAsset } from './CharacterAsset';
+import { loadCharacterAsset, buildAppearanceTexture, type CharacterAsset } from './CharacterAsset';
 import { LocalPlayer3D, RemotePlayer3D, PX_TO_UNIT } from './Player3D';
 import { OverheadLayer } from './Overhead';
 
@@ -83,6 +84,7 @@ const MAP_OFFSET = new THREE.Vector3(0, -50, 0);
 export interface WorldInit {
   characterId: string;
   name: string;
+  appearance?: Appearance;
 }
 
 interface SentState {
@@ -99,6 +101,7 @@ export async function launchWorld3D(
 ) {
   phaserGame.destroy(true);
   const world = new World3D(init);
+  if (import.meta.env.DEV) (window as unknown as { __world3d: World3D }).__world3d = world;
   await world.start();
 }
 
@@ -123,6 +126,8 @@ export class World3D {
   private overheads = new OverheadLayer();
   private chat!: ChatOverlay;
   private emotePanel!: EmotePanel;
+  private customize!: CustomizePanel;
+  private appearance: Appearance;
 
   private keys = new Set<string>();
   private inputEnabled = true;
@@ -150,7 +155,9 @@ export class World3D {
   private groundRay = new THREE.Raycaster();
   private static readonly DOWN = new THREE.Vector3(0, -1, 0);
 
-  constructor(private init: WorldInit) {}
+  constructor(private init: WorldInit) {
+    this.appearance = init.appearance ?? { color: 0, face: 0 };
+  }
 
   async start() {
     this.selfDef = getCharacter(this.init.characterId) ?? CHARACTERS[0];
@@ -174,6 +181,11 @@ export class World3D {
     this.dayNight = new DayNightToggle({
       initial: DEFAULT_MAP_VARIANT,
       onChange: (v) => this.setMapVariant(v),
+    });
+    this.customize = new CustomizePanel({
+      characterId: this.selfDef.id,
+      initial: this.appearance,
+      onChange: (a) => this.setSelfAppearance(a),
     });
     this.renderer.setAnimationLoop(() => this.tick());
   }
@@ -396,6 +408,7 @@ export class World3D {
 
   private setupPlayer() {
     this.player = new LocalPlayer3D(this.asset, CONFIG.SPAWN.x, CONFIG.SPAWN.y);
+    void this.applyAppearance(this.player, this.selfDef.id, this.appearance);
     this.scene.add(this.player.group);
     this.overheads.ensure('self', this.init.name);
 
@@ -481,6 +494,7 @@ export class World3D {
       this.socket.emit('player:join', {
         characterId: this.init.characterId,
         name: this.init.name,
+        appearance: this.appearance,
         x: Math.round(this.player.posPx.x),
         y: Math.round(this.player.posPx.y),
         dir: this.player.direction,
@@ -521,10 +535,16 @@ export class World3D {
       this.emitOnline();
     };
 
+    const onAppearance: ServerToClientEvents['appearance:changed'] = ({ id, appearance }) => {
+      const r = this.remotes.get(id);
+      if (r) void this.applyAppearance(r, r.characterId, appearance);
+    };
+
     this.socket.on('world:snapshot', onSnapshot);
     this.socket.on('player:joined', onJoined);
     this.socket.on('player:moved', onMoved);
     this.socket.on('player:left', onLeft);
+    this.socket.on('appearance:changed', onAppearance);
     this.socket.on('connect', join);
     join(); // buffered by socket.io if not connected yet
   }
@@ -547,10 +567,28 @@ export class World3D {
     if (!this.pendingJoins.delete(state.id) || this.remotes.has(state.id)) return;
 
     const r = new RemotePlayer3D(asset, state, def.id);
+    void this.applyAppearance(r, def.id, state.appearance);
     this.remotes.set(state.id, r);
     this.scene.add(r.group);
     this.overheads.ensure(state.id, state.name);
     this.emitOnline();
+  }
+
+  /** Build the color+face body texture and swap it onto a player. */
+  private async applyAppearance(
+    player: { setBodyTexture(tex: THREE.Texture): void },
+    characterId: string,
+    appearance: Appearance,
+  ) {
+    const tex = await buildAppearanceTexture(characterId, appearance);
+    if (tex) player.setBodyTexture(tex);
+  }
+
+  /** Local player changed their look (from the customize panel): apply + broadcast. */
+  private setSelfAppearance(appearance: Appearance) {
+    this.appearance = appearance;
+    void this.applyAppearance(this.player, this.selfDef.id, appearance);
+    this.socket.emit('appearance:set', { appearance });
   }
 
   private removeRemote(id: string, r: RemotePlayer3D) {

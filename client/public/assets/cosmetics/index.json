@@ -1,0 +1,50 @@
+{
+ "wolf": {
+  "colors": 5,
+  "faces": 23
+ },
+ "sheep": {
+  "colors": 5,
+  "faces": 23
+ },
+ "bat": {
+  "colors": 5,
+  "faces": 23
+ },
+ "bison": {
+  "colors": 5,
+  "faces": 23
+ },
+ "cat": {
+  "colors": 5,
+  "faces": 23
+ },
+ "chameleon": {
+  "colors": 5,
+  "faces": 23
+ },
+ "mole": {
+  "colors": 5,
+  "faces": 23
+ },
+ "monkey": {
+  "colors": 5,
+  "faces": 23
+ },
+ "panda": {
+  "colors": 5,
+  "faces": 23
+ },
+ "penguin": {
+  "colors": 5,
+  "faces": 23
+ },
+ "rabbit": {
+  "colors": 5,
+  "faces": 23
+ },
+ "whale": {
+  "colors": 5,
+  "faces": 23
+ }
+}

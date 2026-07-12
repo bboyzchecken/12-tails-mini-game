@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import type { Appearance } from '@12tails/shared/events';
 
 /** Clip names inside the exported glb (ripped ids — see memory/unity-rip-assets).
  *  Most heroes only have `run` (walk exists just on wolf/cat), so movement
@@ -10,11 +11,12 @@ const CLIP_MOVE = [/walk/i, /run/i];
 
 /** The bits of a CharacterDef the 3D loader needs. */
 export interface CharacterModelSource {
+  id: string;
   model: string;
-  overlay: string;
 }
 
 export interface CharacterAsset {
+  id: string;
   template: THREE.Group;
   clips: THREE.AnimationClip[];
 }
@@ -26,6 +28,8 @@ export interface CharacterInstance {
   walk: THREE.AnimationAction | null;
   /** Every clip in the model — emote actions (sit/dance/...) look themselves up here. */
   clips: THREE.AnimationClip[];
+  /** Per-instance body materials, retextured to apply color/face appearance. */
+  materials: THREE.MeshStandardMaterial[];
 }
 
 const cache = new Map<string, Promise<CharacterAsset>>();
@@ -83,7 +87,6 @@ async function load(src: CharacterModelSource): Promise<CharacterAsset> {
       child.position.set(0, 0, 0);
     }
   }
-  const faceOverlay = await loadImage(bust(src.overlay)).catch(() => null);
 
   gltf.scene.traverse((obj) => {
     if (!(obj instanceof THREE.Mesh)) return;
@@ -98,51 +101,88 @@ async function load(src: CharacterModelSource): Promise<CharacterAsset> {
     // fully inverted, cat/rabbit partially) — render both faces so no body part
     // gets backface-culled away.
     mat.side = THREE.DoubleSide;
-    if (faceOverlay && mat.map) mat.map = compositeFace(mat.map, faceOverlay);
   });
 
-  return { template: gltf.scene, clips: gltf.animations };
+  return { id: src.id, template: gltf.scene, clips: gltf.animations };
+}
+
+// -------------------------------------------------------- appearance textures
+
+const texCache = new Map<string, Promise<THREE.Texture | null>>();
+const imgCache = new Map<string, Promise<HTMLImageElement>>();
+
+function cosmeticUrl(id: string, kind: 'color' | 'face', n: number): string {
+  return `assets/cosmetics/${id}/${kind}/${n}.png`;
 }
 
 /**
- * The game ships bodies without faces; eyes/mouth live in separate 256×256
- * overlay textures (armors/overlay/) sharing the body's UV space. Bake the
- * overlay onto the body texture once so every clone gets a face for free.
+ * Composite a body texture for one appearance: the chosen color variant with
+ * the chosen face overlay baked into the atlas's top-left quadrant (verified
+ * against the ripped 512px body textures). Cached per id:color:face.
  */
-function compositeFace(map: THREE.Texture, overlay: HTMLImageElement): THREE.Texture {
-  const img = map.image as { width: number; height: number } | undefined;
-  if (!img?.width) return map;
+export function buildAppearanceTexture(id: string, a: Appearance): Promise<THREE.Texture | null> {
+  const key = `${id}:${a.color}:${a.face}`;
+  let p = texCache.get(key);
+  if (!p) {
+    p = composeAppearance(id, a);
+    texCache.set(key, p);
+  }
+  return p;
+}
 
-  const canvas = document.createElement('canvas');
-  canvas.width = img.width;
-  canvas.height = img.height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return map;
-  ctx.drawImage(map.image as CanvasImageSource, 0, 0);
-  // The 256px overlay maps to the atlas's top-left quadrant (the face patch),
-  // NOT the whole atlas — verified against the ripped 512px body textures.
-  ctx.drawImage(overlay, 0, 0, canvas.width / 2, canvas.height / 2);
+async function composeAppearance(id: string, a: Appearance): Promise<THREE.Texture | null> {
+  try {
+    const [color, face] = await Promise.all([
+      loadImage(cosmeticUrl(id, 'color', a.color)),
+      loadImage(cosmeticUrl(id, 'face', a.face)).catch(() => null),
+    ]);
+    const canvas = document.createElement('canvas');
+    canvas.width = color.width;
+    canvas.height = color.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(color, 0, 0);
+    if (face) ctx.drawImage(face, 0, 0, canvas.width / 2, canvas.height / 2);
 
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.flipY = map.flipY; // glb textures are not flipped — keep it that way
-  tex.colorSpace = map.colorSpace;
-  tex.wrapS = map.wrapS;
-  tex.wrapT = map.wrapT;
-  return tex;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.flipY = false; // glb UVs are not flipped
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  } catch (err) {
+    console.warn(`[asset] appearance texture failed for ${id}`, err);
+    return null;
+  }
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = url;
-  });
+  let p = imgCache.get(url);
+  if (!p) {
+    p = new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = bust(url);
+    });
+    imgCache.set(url, p);
+  }
+  return p;
 }
+
+// ------------------------------------------------------------- instantiation
 
 /** Clone the template for one player (skinned meshes need SkeletonUtils). */
 export function instantiateCharacter(asset: CharacterAsset): CharacterInstance {
   const group = cloneSkeleton(asset.template) as THREE.Group;
+  const materials: THREE.MeshStandardMaterial[] = [];
+  // Clone materials so each player can carry its own appearance texture.
+  group.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh) || !obj.material) return;
+    const mat = (obj.material as THREE.MeshStandardMaterial).clone();
+    obj.material = mat;
+    materials.push(mat);
+  });
+
   const mixer = new THREE.AnimationMixer(group);
   const idleClip = asset.clips.find((c) => CLIP_IDLE.test(c.name)) ?? asset.clips[0] ?? null;
   let walkClip: THREE.AnimationClip | null = null;
@@ -156,5 +196,6 @@ export function instantiateCharacter(asset: CharacterAsset): CharacterInstance {
     idle: idleClip ? mixer.clipAction(idleClip) : null,
     walk: walkClip ? mixer.clipAction(walkClip) : null,
     clips: asset.clips,
+    materials,
   };
 }

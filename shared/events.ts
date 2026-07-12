@@ -1,9 +1,16 @@
 export type Direction = 'down' | 'up' | 'left' | 'right';
 
+/** How a character is customized — indices into that hero's cosmetics sets. */
+export interface Appearance {
+  color: number; // body-color variant (assets/cosmetics/<id>/color/<n>.png)
+  face: number;  // face overlay      (assets/cosmetics/<id>/face/<n>.png)
+}
+
 export interface PlayerState {
   id: string;          // socket id
   characterId: string; // key ใน characters.json
   name: string;
+  appearance: Appearance;
   x: number;
   y: number;
   dir: Direction;
@@ -19,10 +26,11 @@ export interface ChatMessage {
 
 // Client -> Server
 export interface ClientToServerEvents {
-  'player:join': (p: { characterId: string; name: string; x: number; y: number; dir: Direction }) => void;
+  'player:join': (p: { characterId: string; name: string; appearance: Appearance; x: number; y: number; dir: Direction }) => void;
   'player:move': (p: { x: number; y: number; dir: Direction; moving: boolean }) => void;
   'chat:send':   (p: { text: string }) => void;
   'emote:send':  (p: { emoteId: string }) => void;
+  'appearance:set': (p: { appearance: Appearance }) => void;
 }
 
 // Server -> Client
@@ -33,4 +41,5 @@ export interface ServerToClientEvents {
   'player:left':    (p: { id: string }) => void;
   'chat:message':   (m: ChatMessage) => void;
   'emote:played':   (p: { id: string; emoteId: string }) => void;
+  'appearance:changed': (p: { id: string; appearance: Appearance }) => void;
 }

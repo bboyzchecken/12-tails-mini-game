@@ -29,6 +29,7 @@ abstract class PlayerBase {
   protected walk: THREE.AnimationAction | null;
   protected current: THREE.AnimationAction | null = null;
   protected clips: THREE.AnimationClip[];
+  private materials: THREE.MeshStandardMaterial[];
   /** Playing emote action (sit/dance/...); held until the player moves. */
   protected emoteAction: THREE.AnimationAction | null = null;
   /** Position in server pixel space. */
@@ -45,6 +46,7 @@ abstract class PlayerBase {
     this.idle = inst.idle;
     this.walk = inst.walk;
     this.clips = inst.clips;
+    this.materials = inst.materials;
     this.posPx.set(x, y);
     this.syncTransform(1);
     this.setAnim(false, true);
@@ -76,6 +78,14 @@ abstract class PlayerBase {
     }
     action.fadeIn(ANIM_FADE).play();
     this.emoteAction = action;
+  }
+
+  /** Swap the body texture (color + face composite) from CharacterAsset. */
+  setBodyTexture(tex: THREE.Texture) {
+    for (const m of this.materials) {
+      m.map = tex;
+      m.needsUpdate = true;
+    }
   }
 
   get headPos(): THREE.Vector3 {

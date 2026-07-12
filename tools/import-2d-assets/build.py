@@ -15,6 +15,7 @@ Usage:
   python build.py [RIPPER_ASSETS_DIR]
 Default RIPPER_ASSETS_DIR = D:/12tails/12tail_ripper/mainData/Assets
 """
+import json
 import os
 import sys
 from PIL import Image
@@ -78,6 +79,48 @@ def build_hero(hero: str):
     print(f"  {hero}: thumb OK  overlay {'OK' if ok else 'MISSING'}")
 
 
+def build_cosmetics(index: dict):
+    """
+    Per hero, extract the customization sets that render on the body:
+      - color/<n>.png  = the 5 body-color variants (<Hero>_nude1..5)
+      - face/<n>.png   = the face overlays (<Hero>0..N) composited onto the body
+    Writes assets/cosmetics/<id>/{color,face}/*.png and records counts in `index`.
+    """
+    import shutil, re
+
+    for hero in HEROES:
+        cap = hero.capitalize()
+        mats = os.path.join(HEROES_DIR, hero, "armors", "materials")
+        overlay = os.path.join(HEROES_DIR, hero, "armors", "overlay")
+        out = os.path.join(CLIENT_ASSETS, "cosmetics", hero)
+
+        # colors: <Hero>_nude1..5  (skip R/V weapon-recolor suffixes)
+        color_dir = os.path.join(out, "color")
+        os.makedirs(color_dir, exist_ok=True)
+        colors = sorted(
+            f for f in os.listdir(mats)
+            if re.fullmatch(rf"{cap}_nude\d+\.png", f)
+        )
+        for i, f in enumerate(colors):
+            shutil.copyfile(os.path.join(mats, f), os.path.join(color_dir, f"{i}.png"))
+
+        # faces: <Hero>0..N  (numeric-suffixed overlays only)
+        face_dir = os.path.join(out, "face")
+        os.makedirs(face_dir, exist_ok=True)
+        faces = sorted(
+            (f for f in os.listdir(overlay) if re.fullmatch(rf"{cap}\d+\.png", f)),
+            key=lambda f: int(re.search(r"\d+", f).group()),
+        )
+        for i, f in enumerate(faces):
+            shutil.copyfile(os.path.join(overlay, f), os.path.join(face_dir, f"{i}.png"))
+
+        index[hero] = {"colors": len(colors), "faces": len(faces)}
+        print(f"  {hero}: {len(colors)} colors, {len(faces)} faces")
+
+    with open(os.path.join(CLIENT_ASSETS, "cosmetics", "index.json"), "w") as f:
+        json.dump(index, f, indent=1)
+
+
 def build_emote_system():
     """Full emote set: framed picker icons (gamegui) + overhead bubbles (effects)."""
     import shutil
@@ -103,6 +146,8 @@ def build_emote_system():
 def main():
     build_emote_strip()
     build_emote_system()
+    index = {}
+    build_cosmetics(index)
     for hero in HEROES:
         build_hero(hero)
     print("Done. glb bodies come from Unity's [12Tails > Export All Heroes To GLB].")

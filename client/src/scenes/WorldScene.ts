@@ -228,6 +228,7 @@ export class WorldScene extends Phaser.Scene {
       this.socket.emit('player:join', {
         characterId: init.characterId,
         name: init.name,
+        appearance: { color: 0, face: 0 }, // legacy 2D scene (unused after 3D pivot)
         x: Math.round(this.player.x),
         y: Math.round(this.player.y),
         dir: this.player.direction,

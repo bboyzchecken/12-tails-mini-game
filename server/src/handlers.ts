@@ -1,5 +1,6 @@
 import type { Server, Socket } from 'socket.io';
 import type {
+  Appearance,
   ChatMessage,
   ClientToServerEvents,
   Direction,
@@ -20,6 +21,14 @@ function safeDir(d: unknown): Direction {
 
 function safeNum(n: unknown, fallback: number): number {
   return typeof n === 'number' && Number.isFinite(n) ? n : fallback;
+}
+
+/** Clamp appearance indices to small non-negative ints (client validates ranges). */
+function safeAppearance(a: unknown): Appearance {
+  const o = (a ?? {}) as Partial<Appearance>;
+  const idx = (n: unknown) =>
+    typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.min(255, Math.floor(n))) : 0;
+  return { color: idx(o.color), face: idx(o.face) };
 }
 
 function safeName(name: unknown): string {
@@ -50,6 +59,7 @@ export function registerHandlers(io: IO, socket: Sock) {
       id: socket.id,
       characterId: String(p.characterId ?? '').slice(0, 32),
       name: safeName(p.name),
+      appearance: safeAppearance(p.appearance),
       x: safeNum(p.x, CONFIG.SPAWN.x),
       y: safeNum(p.y, CONFIG.SPAWN.y),
       dir: safeDir(p.dir),
@@ -97,6 +107,12 @@ export function registerHandlers(io: IO, socket: Sock) {
     if (now - last < CONFIG.EMOTE_COOLDOWN_MS) return; // spam guard
     lastEmoteAt.set(socket.id, now);
     io.emit('emote:played', { id: socket.id, emoteId }); // id only — clients own the art
+  });
+
+  socket.on('appearance:set', (p) => {
+    const appearance = safeAppearance(p?.appearance);
+    if (!world.setAppearance(socket.id, appearance)) return; // must join first
+    io.emit('appearance:changed', { id: socket.id, appearance });
   });
 
   socket.on('disconnect', () => {
