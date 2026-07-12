@@ -4,6 +4,10 @@ export type Direction = 'down' | 'up' | 'left' | 'right';
 export interface Appearance {
   color: number; // body-color variant (assets/cosmetics/<id>/color/<n>.png)
   face: number;  // face overlay      (assets/cosmetics/<id>/face/<n>.png)
+  /** Equipment ids attached to mount bones (assets/equipment/<id>/<slot>/<name>.glb),
+   *  or null/absent for an empty slot. */
+  weapon?: string | null; // held in hand (mount_Hand_R)
+  hat?: string | null;    // worn overhead (mount_OverHead)
 }
 
 export interface PlayerState {

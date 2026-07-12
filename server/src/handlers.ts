@@ -28,7 +28,9 @@ function safeAppearance(a: unknown): Appearance {
   const o = (a ?? {}) as Partial<Appearance>;
   const idx = (n: unknown) =>
     typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.min(255, Math.floor(n))) : 0;
-  return { color: idx(o.color), face: idx(o.face) };
+  const equip = (s: unknown) =>
+    typeof s === 'string' && s ? s.slice(0, 48).replace(/[^\w-]/g, '') : null;
+  return { color: idx(o.color), face: idx(o.face), weapon: equip(o.weapon), hat: equip(o.hat) };
 }
 
 function safeName(name: unknown): string {

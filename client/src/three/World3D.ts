@@ -14,6 +14,7 @@ import type { AppearanceControl } from '../ui/appearanceControl';
 import { DayNightToggle, type MapVariant } from '../ui/DayNightToggle';
 import { LoadingBar } from '../ui/LoadingBar';
 import { loadCharacterAsset, buildAppearanceTexture, type CharacterAsset } from './CharacterAsset';
+import { loadEquipment, equipmentUrl, type EquipSlot } from './EquipmentLoader';
 import { LocalPlayer3D, RemotePlayer3D, PX_TO_UNIT } from './Player3D';
 import { OverheadLayer } from './Overhead';
 
@@ -587,14 +588,30 @@ export class World3D {
     this.emitOnline();
   }
 
-  /** Build the color+face body texture and swap it onto a player. */
+  /** Apply a full appearance (body color/face texture + equipment) to a player. */
   private async applyAppearance(
-    player: { setBodyTexture(tex: THREE.Texture): void },
+    player: LocalPlayer3D | RemotePlayer3D,
     characterId: string,
     appearance: Appearance,
   ) {
     const tex = await buildAppearanceTexture(characterId, appearance);
     if (tex) player.setBodyTexture(tex);
+    await this.applyEquipment(player, characterId, 'weapon', appearance.weapon ?? null);
+    await this.applyEquipment(player, characterId, 'hat', appearance.hat ?? null);
+  }
+
+  private async applyEquipment(
+    player: LocalPlayer3D | RemotePlayer3D,
+    hero: string,
+    slot: EquipSlot,
+    id: string | null,
+  ) {
+    if (!id) {
+      player.setEquipment(slot, null);
+      return;
+    }
+    const obj = await loadEquipment(equipmentUrl(hero, slot, id));
+    player.setEquipment(slot, obj);
   }
 
   /** Local player changed their look (from the customize panel): apply + broadcast. */

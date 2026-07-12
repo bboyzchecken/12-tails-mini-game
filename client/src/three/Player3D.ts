@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from '@12tails/shared/config';
 import type { Direction, PlayerState } from '@12tails/shared/events';
 import { instantiateCharacter, type CharacterAsset, type CharacterInstance } from './CharacterAsset';
+import { MOUNT_BONE, type EquipSlot } from './EquipmentLoader';
 
 /** Server keeps 2D pixel coords (x right, y down). 3D maps px → tiles: x→x, y→z. */
 export const PX_TO_UNIT = 1 / CONFIG.TILE;
@@ -30,6 +31,7 @@ abstract class PlayerBase {
   protected current: THREE.AnimationAction | null = null;
   protected clips: THREE.AnimationClip[];
   private materials: THREE.MeshStandardMaterial[];
+  private equipped = new Map<EquipSlot, THREE.Object3D>();
   /** Playing emote action (sit/dance/...); held until the player moves. */
   protected emoteAction: THREE.AnimationAction | null = null;
   /** Position in server pixel space. */
@@ -86,6 +88,35 @@ abstract class PlayerBase {
       m.map = tex;
       m.needsUpdate = true;
     }
+  }
+
+  /**
+   * Attach (or clear) an equipment mesh on a mount bone. The mesh follows the
+   * bone through animation because it's parented to it. Its own root carries
+   * the mount-local transform from Unity.
+   */
+  setEquipment(slot: EquipSlot, obj: THREE.Object3D | null) {
+    const prev = this.equipped.get(slot);
+    if (prev) {
+      prev.parent?.remove(prev);
+      this.equipped.delete(slot);
+    }
+    if (!obj) return;
+    const bone = this.findBone(MOUNT_BONE[slot]);
+    if (!bone) {
+      console.warn(`[player] mount bone '${MOUNT_BONE[slot]}' not found`);
+      return;
+    }
+    bone.add(obj);
+    this.equipped.set(slot, obj);
+  }
+
+  private findBone(name: string): THREE.Object3D | null {
+    let found: THREE.Object3D | null = null;
+    this.group.traverse((o) => {
+      if (!found && o.name === name) found = o;
+    });
+    return found;
   }
 
   get headPos(): THREE.Vector3 {
