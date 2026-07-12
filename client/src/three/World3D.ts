@@ -666,10 +666,14 @@ export class World3D {
     // off-hand — with the `_l` half of an explicit pair, else the same mesh.
     const { right, left } = await dualWieldHands(hero, id);
     player.setEquipment('weapon', await loadEquipment(equipmentUrl(hero, 'weapon', right)), hero);
+    // Reusing the main-hand mesh on the mirrored left bone points it the wrong
+    // way, so mirror it; an explicit `_l` mesh is already mirrored, so don't.
+    const mirrorOff = left != null && left === right;
     player.setEquipment(
       'weaponL',
       left ? await loadEquipment(equipmentUrl(hero, 'weapon', left)) : null,
       hero,
+      mirrorOff,
     );
   }
 

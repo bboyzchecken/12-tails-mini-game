@@ -116,7 +116,7 @@ abstract class PlayerBase {
    * Unity→glTF frame as the bone), so a plain local attach reproduces the game's
    * grip — no re-orientation. `hero` selects the head bone for hats.
    */
-  setEquipment(slot: EquipSlot, obj: THREE.Object3D | null, hero = '') {
+  setEquipment(slot: EquipSlot, obj: THREE.Object3D | null, hero = '', mirror = false) {
     const prev = this.equipped.get(slot);
     if (prev) {
       prev.parent?.remove(prev);
@@ -130,10 +130,12 @@ abstract class PlayerBase {
     }
     // Wrapper stays identity; the item's own node keeps its baked pose. Only the
     // showcase translation was stripped at load, so this seats grip/crown on the
-    // bone exactly as Unity parented it.
+    // bone exactly as Unity parented it. `mirror` flips the off-hand copy (scale
+    // −Y) so a dual-wielder's reused main-hand mesh sits symmetrically on the
+    // mirrored left bone instead of pointing the opposite way.
     obj.position.set(0, 0, 0);
     obj.quaternion.identity();
-    obj.scale.set(1, 1, 1);
+    obj.scale.set(1, mirror ? -1 : 1, 1);
     bone.add(obj);
     this.equipped.set(slot, obj);
   }
