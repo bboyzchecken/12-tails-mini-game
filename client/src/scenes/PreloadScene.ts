@@ -1,11 +1,10 @@
 import Phaser from 'phaser';
-import { CONFIG } from '@12tails/shared/config';
-import { CHARACTERS, FACE } from '../manifest';
+import { CHARACTERS } from '../manifest';
 
 /**
- * Loads the map and every character listed in characters.json, then hands off
- * to the character-select screen. Each character sheet is keyed by its id so
- * later scenes can spawn it directly; thumbnails are keyed `<id>-thumb`.
+ * Loads every character thumbnail (keyed `<id>-thumb`) for the select screen.
+ * World rendering is three.js now (World3D) — bodies are .glb files loaded
+ * there, so no spritesheets are needed here anymore.
  */
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -22,18 +21,7 @@ export class PreloadScene extends Phaser.Scene {
       .setOrigin(0.5);
     this.load.on('progress', (p: number) => label.setText(`Loading… ${Math.round(p * 100)}%`));
 
-    this.load.tilemapTiledJSON('novice-camp', 'assets/maps/novice-camp.json');
-    this.load.image('tiles', 'assets/maps/tileset.png');
-
     for (const c of CHARACTERS) {
-      this.load.spritesheet(c.id, c.sheet, {
-        frameWidth: CONFIG.FRAME.W,
-        frameHeight: CONFIG.FRAME.H,
-      });
-      this.load.spritesheet(`${c.id}-faces`, c.faces, {
-        frameWidth: FACE.w,
-        frameHeight: FACE.h,
-      });
       this.load.image(`${c.id}-thumb`, c.thumb);
     }
   }

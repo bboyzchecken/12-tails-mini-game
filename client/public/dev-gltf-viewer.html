@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>12Tails · glTF viewer (dev)</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #14141c; color: #e0e0ff;
+    font: 13px/1.5 ui-monospace, monospace; overflow: hidden; }
+  #app { position: fixed; inset: 0; }
+  #panel { position: fixed; top: 12px; left: 12px; z-index: 10; width: 280px;
+    background: rgba(20,20,32,.88); border: 1px solid #33334d; border-radius: 10px;
+    padding: 14px; backdrop-filter: blur(6px); }
+  #panel h1 { font-size: 13px; letter-spacing: .5px; margin-bottom: 8px; color: #9fd0ff; }
+  #panel p { color: #9a9ac0; font-size: 12px; margin-bottom: 10px; }
+  label { display: block; margin: 10px 0 4px; color: #c8c8ea; font-size: 11px; }
+  select, button { width: 100%; padding: 7px 8px; background: #1e1e2e; color: #e0e0ff;
+    border: 1px solid #3a3a5a; border-radius: 6px; font: inherit; }
+  button { cursor: pointer; margin-top: 6px; }
+  button:hover { background: #26263a; }
+  #info { margin-top: 12px; font-size: 11px; color: #8a8ab0; white-space: pre-wrap; }
+  #drop { position: fixed; inset: 0; z-index: 20; display: none; align-items: center;
+    justify-content: center; background: rgba(20,30,60,.85); font-size: 20px; color: #9fd0ff;
+    border: 3px dashed #4a6aff; }
+  #drop.on { display: flex; }
+  .row { display: flex; gap: 6px; }
+  .row button { margin-top: 0; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="panel">
+  <h1>glTF VIEWER (dev)</h1>
+  <p>Drag a <b>.glb</b> / <b>.gltf</b> anywhere to load it. Verify the model looks right and the walk animation plays.</p>
+  <label>Animation clip</label>
+  <select id="clips"><option>— no model loaded —</option></select>
+  <div class="row">
+    <button id="play">⏸ pause</button>
+    <button id="reset">reset cam</button>
+  </div>
+  <label><input type="checkbox" id="wire" style="width:auto"> wireframe</label>
+  <div id="info">no model loaded</div>
+</div>
+<div id="drop">drop .glb / .gltf to load</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x14141c);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444466, 2.2));
+const dir = new THREE.DirectionalLight(0xffffff, 1.4);
+dir.position.set(3, 8, 5);
+scene.add(dir);
+const grid = new THREE.GridHelper(10, 20, 0x445, 0x223);
+scene.add(grid);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 1000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+const clock = new THREE.Clock();
+const loader = new GLTFLoader();
+let mixer = null, actions = [], current = null, model = null, playing = true;
+
+const clipsEl = document.getElementById('clips');
+const infoEl = document.getElementById('info');
+
+function frameModel(obj) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
+  controls.target.copy(center);
+  camera.position.set(center.x + maxDim * 1.4, center.y + maxDim * 0.6, center.z + maxDim * 2.2);
+  camera.near = maxDim / 100; camera.far = maxDim * 100; camera.updateProjectionMatrix();
+  controls.update();
+}
+
+function loadGLTF(url, name) {
+  loader.load(url, (gltf) => {
+    if (model) scene.remove(model);
+    if (mixer) mixer.stopAllAction();
+    model = gltf.scene;
+    scene.add(model);
+    frameModel(model);
+
+    let tris = 0, meshes = 0;
+    model.traverse((o) => { if (o.isMesh && o.geometry) { meshes++;
+      tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; } });
+
+    mixer = new THREE.AnimationMixer(model);
+    actions = gltf.animations.map((c) => mixer.clipAction(c));
+    clipsEl.innerHTML = '';
+    gltf.animations.forEach((c, i) => {
+      const o = document.createElement('option');
+      o.value = i; o.textContent = `${c.name} (${c.duration.toFixed(2)}s)`;
+      clipsEl.appendChild(o);
+    });
+    // prefer a clip named walk, else first
+    let idx = gltf.animations.findIndex((c) => /walk/i.test(c.name));
+    if (idx < 0) idx = 0;
+    if (actions.length) { clipsEl.value = idx; playClip(idx); }
+    else clipsEl.innerHTML = '<option>— no animations in file —</option>';
+
+    infoEl.textContent =
+      `file: ${name}\nmeshes: ${meshes}   tris: ${Math.round(tris).toLocaleString()}\n` +
+      `animations: ${gltf.animations.length}\n` +
+      (gltf.animations.length ? gltf.animations.map((c) => '· ' + c.name).join('\n') : '(none)');
+  }, undefined, (err) => { infoEl.textContent = 'LOAD ERROR:\n' + err; console.error(err); });
+}
+
+function playClip(i) {
+  if (current) current.fadeOut(0.2);
+  current = actions[i];
+  current.reset().fadeIn(0.2).play();
+  current.paused = !playing;
+}
+
+clipsEl.addEventListener('change', () => playClip(+clipsEl.value));
+document.getElementById('play').addEventListener('click', (e) => {
+  playing = !playing; if (current) current.paused = !playing;
+  e.target.textContent = playing ? '⏸ pause' : '▶ play';
+});
+document.getElementById('reset').addEventListener('click', () => { if (model) frameModel(model); });
+document.getElementById('wire').addEventListener('change', (e) => {
+  if (model) model.traverse((o) => { if (o.isMesh) o.material.wireframe = e.target.checked; });
+});
+
+// drag & drop
+const drop = document.getElementById('drop');
+addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('on'); });
+addEventListener('dragleave', (e) => { if (e.target === drop) drop.classList.remove('on'); });
+addEventListener('drop', (e) => {
+  e.preventDefault(); drop.classList.remove('on');
+  const file = e.dataTransfer.files[0]; if (!file) return;
+  loadGLTF(URL.createObjectURL(file), file.name);
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta();
+  if (mixer && playing) mixer.update(dt);
+  controls.update();
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>

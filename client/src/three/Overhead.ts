@@ -1,0 +1,113 @@
+import * as THREE from 'three';
+import { CONFIG } from '@12tails/shared/config';
+
+const EMOTE_ICON = 48; // px, on-screen emote face size
+
+/**
+ * DOM layer for per-player overheads (name tag, chat bubble, emote face),
+ * projected from world positions every frame. Keeps the "UI is DOM, not
+ * in-engine" rule from the 2D build: the 3D scene renders only the world.
+ */
+export class OverheadLayer {
+  private root: HTMLDivElement;
+  private items = new Map<string, Overhead>();
+  private v = new THREE.Vector3();
+
+  constructor() {
+    this.root = document.createElement('div');
+    this.root.style.cssText =
+      'position:fixed;inset:0;pointer-events:none;z-index:5;overflow:hidden;' +
+      'font-family:Tahoma,"Leelawadee UI",sans-serif;';
+    document.body.appendChild(this.root);
+  }
+
+  ensure(id: string, name: string): Overhead {
+    let item = this.items.get(id);
+    if (!item) {
+      item = new Overhead(name);
+      this.root.appendChild(item.el);
+      this.items.set(id, item);
+    }
+    return item;
+  }
+
+  remove(id: string) {
+    this.items.get(id)?.el.remove();
+    this.items.delete(id);
+  }
+
+  /** Project `worldPos` (head height already added) to screen and place the overhead. */
+  place(id: string, worldPos: THREE.Vector3, camera: THREE.Camera) {
+    const item = this.items.get(id);
+    if (!item) return;
+    this.v.copy(worldPos).project(camera);
+    const behind = this.v.z > 1;
+    item.el.style.display = behind ? 'none' : '';
+    if (behind) return;
+    const x = (this.v.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-this.v.y * 0.5 + 0.5) * window.innerHeight;
+    item.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
+  }
+
+  destroy() {
+    this.root.remove();
+    this.items.clear();
+  }
+}
+
+class Overhead {
+  readonly el: HTMLDivElement;
+  private bubble: HTMLDivElement;
+  private emote: HTMLDivElement;
+  private bubbleTimer: number | undefined;
+  private emoteTimer: number | undefined;
+
+  constructor(name: string) {
+    this.el = document.createElement('div');
+    this.el.style.cssText =
+      'position:absolute;left:0;top:0;display:flex;flex-direction:column;' +
+      'align-items:center;gap:3px;white-space:nowrap;will-change:transform;';
+
+    this.emote = document.createElement('div');
+    this.emote.style.cssText =
+      `width:${EMOTE_ICON}px;height:${EMOTE_ICON}px;display:none;border-radius:50%;` +
+      'background-color:rgba(255,255,255,0.95);border:2px solid rgba(185,185,198,0.9);' +
+      'background-repeat:no-repeat;';
+
+    this.bubble = document.createElement('div');
+    this.bubble.style.cssText =
+      'display:none;max-width:200px;padding:5px 10px;border-radius:10px;' +
+      'background:rgba(255,255,255,0.94);color:#1c1c2e;font-size:13px;line-height:1.3;' +
+      'white-space:pre-wrap;word-break:break-word;text-align:center;' +
+      'box-shadow:0 1px 4px rgba(0,0,0,0.35);';
+
+    const tag = document.createElement('div');
+    tag.textContent = name;
+    tag.style.cssText =
+      'font-size:11px;color:#fff;background:rgba(0,0,0,0.4);padding:1px 6px;' +
+      'border-radius:6px;text-shadow:1px 1px 0 rgba(0,0,0,0.8);';
+
+    this.el.append(this.emote, this.bubble, tag);
+  }
+
+  showBubble(text: string) {
+    this.bubble.textContent = text;
+    this.bubble.style.display = 'block';
+    window.clearTimeout(this.bubbleTimer);
+    this.bubbleTimer = window.setTimeout(() => {
+      this.bubble.style.display = 'none';
+    }, CONFIG.BUBBLE_MS);
+  }
+
+  /** Show a mood bubble image (assets/ui/bubbles/<id>.png) above the head. */
+  showEmote(url: string) {
+    this.emote.style.backgroundImage = `url(${url})`;
+    this.emote.style.backgroundSize = 'contain';
+    this.emote.style.backgroundPosition = 'center';
+    this.emote.style.display = 'block';
+    window.clearTimeout(this.emoteTimer);
+    this.emoteTimer = window.setTimeout(() => {
+      this.emote.style.display = 'none';
+    }, CONFIG.EMOTE_SHOW_MS);
+  }
+}

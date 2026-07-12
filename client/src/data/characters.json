@@ -15,22 +15,124 @@
   },
   "characters": [
     {
-      "id": "dog",
-      "name": "หมา",
+      "id": "wolf",
+      "name": "หมาป่า",
       "tribe": "นักรบ",
-      "color": "#C8A165",
-      "sheet": "assets/characters/dog/sheet.png",
-      "faces": "assets/characters/dog/faces.png",
-      "thumb": "assets/characters/dog/thumb.png"
+      "color": "#C84C4C",
+      "model": "assets/models/wolf.glb",
+      "overlay": "assets/models/wolf-face.png",
+      "faces": "assets/ui/emote-faces.png",
+      "thumb": "assets/characters/wolf/thumb.png"
     },
     {
       "id": "sheep",
       "name": "แกะ",
       "tribe": "นักบวช",
       "color": "#B9B2A8",
-      "sheet": "assets/characters/sheep/sheet.png",
-      "faces": "assets/characters/sheep/faces.png",
+      "model": "assets/models/sheep.glb",
+      "overlay": "assets/models/sheep-face.png",
+      "faces": "assets/ui/emote-faces.png",
       "thumb": "assets/characters/sheep/thumb.png"
+    },
+    {
+      "id": "cat",
+      "name": "แมว",
+      "tribe": "",
+      "color": "#F0B27A",
+      "model": "assets/models/cat.glb",
+      "overlay": "assets/models/cat-face.png",
+      "faces": "assets/ui/emote-faces.png",
+      "thumb": "assets/characters/cat/thumb.png"
+    },
+    {
+      "id": "rabbit",
+      "name": "กระต่าย",
+      "tribe": "",
+      "color": "#F5B7B1",
+      "model": "assets/models/rabbit.glb",
+      "overlay": "assets/models/rabbit-face.png",
+      "faces": "assets/ui/emote-faces.png",
+      "thumb": "assets/characters/rabbit/thumb.png"
+    },
+    {
+      "id": "panda",
+      "name": "แพนด้า",
+      "tribe": "",
+      "color": "#E5E7E9",
+      "model": "assets/models/panda.glb",
+      "overlay": "assets/models/panda-face.png",
+      "faces": "assets/ui/emote-faces.png",
+      "thumb": "assets/characters/panda/thumb.png"
+    },
+    {
+      "id": "penguin",
+      "name": "เพนกวิน",
+      "tribe": "",
+      "color": "#85C1E9",
+      "model": "assets/models/penguin.glb",
+      "overlay": "assets/models/penguin-face.png",
+      "faces": "assets/ui/emote-faces.png",
+      "thumb": "assets/characters/penguin/thumb.png"
+    },
+    {
+      "id": "bat",
+      "name": "ค้างคาว",
+      "tribe": "",
+      "color": "#8E7CC3",
+      "model": "assets/models/bat.glb",
+      "overlay": "assets/models/bat-face.png",
+      "faces": "assets/ui/emote-faces.png",
+      "thumb": "assets/characters/bat/thumb.png"
+    },
+    {
+      "id": "bison",
+      "name": "ไบซัน",
+      "tribe": "",
+      "color": "#A0522D",
+      "model": "assets/models/bison.glb",
+      "overlay": "assets/models/bison-face.png",
+      "faces": "assets/ui/emote-faces.png",
+      "thumb": "assets/characters/bison/thumb.png"
+    },
+    {
+      "id": "chameleon",
+      "name": "กิ้งก่า",
+      "tribe": "",
+      "color": "#7DCEA0",
+      "model": "assets/models/chameleon.glb",
+      "overlay": "assets/models/chameleon-face.png",
+      "faces": "assets/ui/emote-faces.png",
+      "thumb": "assets/characters/chameleon/thumb.png"
+    },
+    {
+      "id": "mole",
+      "name": "ตุ่น",
+      "tribe": "",
+      "color": "#B08968",
+      "model": "assets/models/mole.glb",
+      "overlay": "assets/models/mole-face.png",
+      "faces": "assets/ui/emote-faces.png",
+      "thumb": "assets/characters/mole/thumb.png"
+    },
+    {
+      "id": "monkey",
+      "name": "ลิง",
+      "tribe": "",
+      "color": "#D4A24C",
+      "model": "assets/models/monkey.glb",
+      "overlay": "assets/models/monkey-face.png",
+      "faces": "assets/ui/emote-faces.png",
+      "thumb": "assets/characters/monkey/thumb.png"
+    },
+    {
+      "id": "whale",
+      "name": "วาฬ",
+      "tribe": "",
+      "color": "#5DADE2",
+      "model": "assets/models/whale.glb",
+      "overlay": "assets/models/whale-face.png",
+      "faces": "assets/ui/emote-faces.png",
+      "thumb": "assets/characters/whale/thumb.png"
     }
   ]
 }

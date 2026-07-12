@@ -6,7 +6,11 @@ export interface CharacterDef {
   name: string;
   tribe: string;
   color: string;
-  sheet: string;
+  /** 3D body (.glb) exported from the game rip. */
+  model: string;
+  /** Face overlay texture composited onto the body atlas (top-left quadrant). */
+  overlay: string;
+  /** Emote strip for chat bubbles (shared across characters). */
   faces: string;
   thumb: string;
 }

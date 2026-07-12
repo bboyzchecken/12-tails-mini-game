@@ -4,7 +4,6 @@ import { connectSocket } from './net/socket';
 import { BootScene } from './scenes/BootScene';
 import { PreloadScene } from './scenes/PreloadScene';
 import { CharacterSelectScene } from './scenes/CharacterSelectScene';
-import { WorldScene } from './scenes/WorldScene';
 import { mountDemoBanner } from './ui/store/DemoBanner';
 import { mountControlHints } from './ui/hud/ControlHints';
 import { mountLocationTitle } from './ui/hud/LocationTitle';
@@ -26,7 +25,9 @@ const game = new Phaser.Game({
     default: 'arcade',
     arcade: { gravity: { x: 0, y: 0 }, debug: false },
   },
-  scene: [BootScene, PreloadScene, CharacterSelectScene, WorldScene],
+  // 3D pivot: the world is three.js (three/World3D), launched from CharacterSelect.
+  // The old Phaser WorldScene stays on disk for reference but is no longer wired.
+  scene: [BootScene, PreloadScene, CharacterSelectScene],
 });
 
 // Handy for debugging in the dev console; stripped from production builds.

@@ -41,14 +41,18 @@ export class CharacterSelectScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // Character cards, centered as a row.
+    // Character cards, centered as a grid (up to 6 per row — 12 heroes = 2 rows).
     const n = CHARACTERS.length;
-    const totalW = n * CARD_W + (n - 1) * GAP;
+    const perRow = Math.min(n, 6);
+    const rows = Math.ceil(n / perRow);
+    const totalW = perRow * CARD_W + (perRow - 1) * GAP;
     const startX = width / 2 - totalW / 2 + CARD_W / 2;
-    const cy = height * 0.46;
+    const rowGap = CARD_H + 24;
+    const cy0 = height * 0.44 - ((rows - 1) * rowGap) / 2;
 
     CHARACTERS.forEach((def, i) => {
-      const x = startX + i * (CARD_W + GAP);
+      const x = startX + (i % perRow) * (CARD_W + GAP);
+      const cy = cy0 + Math.floor(i / perRow) * rowGap;
       const ring = this.add.rectangle(x, cy, CARD_W, CARD_H, 0x24243f).setStrokeStyle(3, 0x44446a);
       this.add.image(x, cy - 34, `${def.id}-thumb`).setDisplaySize(120, 120);
       this.add
@@ -66,7 +70,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     // Nickname input (HTML input via Phaser DOM element).
     this.nameInput = this.add.dom(
       width / 2,
-      height * 0.74,
+      height * 0.8,
       'input',
       'width:260px;padding:11px 14px;font-size:16px;border-radius:10px;' +
         'border:2px solid #44446a;background:#20203a;color:#fff;outline:none;text-align:center;',
@@ -82,7 +86,7 @@ export class CharacterSelectScene extends Phaser.Scene {
 
     // Enter button.
     const btn = this.add
-      .text(width / 2, height * 0.87, '▶ เข้าเกม', {
+      .text(width / 2, height * 0.91, '▶ เข้าเกม', {
         fontFamily: 'sans-serif',
         fontSize: '20px',
         fontStyle: 'bold',
@@ -112,6 +116,10 @@ export class CharacterSelectScene extends Phaser.Scene {
     const def = CHARACTERS[this.selected];
     const input = this.nameInput.node as HTMLInputElement;
     const name = input.value.trim().slice(0, CONFIG.NAME_MAX_LEN) || 'ผู้เล่น';
-    this.scene.start('World', { characterId: def.id, name });
+    // 3D pivot: the world is now three.js (World3D), replacing the Phaser
+    // WorldScene. Dynamic import keeps three.js out of the boot bundle.
+    void import('../three/World3D').then(({ launchWorld3D }) =>
+      launchWorld3D({ characterId: def.id, name }, this.game),
+    );
   }
 }
