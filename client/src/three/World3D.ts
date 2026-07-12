@@ -658,17 +658,18 @@ export class World3D {
       return;
     }
     if (slot !== 'weapon') {
-      player.setEquipment(slot, await loadEquipment(equipmentUrl(hero, slot, id)));
+      player.setEquipment(slot, await loadEquipment(equipmentUrl(hero, slot, id)), hero);
       return;
     }
 
     // Weapons: single-wield by default. Dual-wield heroes (wolf) also fill the
     // off-hand — with the `_l` half of an explicit pair, else the same mesh.
     const { right, left } = await dualWieldHands(hero, id);
-    player.setEquipment('weapon', await loadEquipment(equipmentUrl(hero, 'weapon', right)));
+    player.setEquipment('weapon', await loadEquipment(equipmentUrl(hero, 'weapon', right)), hero);
     player.setEquipment(
       'weaponL',
       left ? await loadEquipment(equipmentUrl(hero, 'weapon', left)) : null,
+      hero,
     );
   }
 

@@ -2,9 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from '@12tails/shared/config';
 import type { Direction, PlayerState } from '@12tails/shared/events';
 import { instantiateCharacter, type CharacterAsset, type CharacterInstance } from './CharacterAsset';
-import { MOUNT_PATTERNS, ITEM_OUT_AXIS, type EquipSlot } from './EquipmentLoader';
-
-const WORLD_UP = new THREE.Vector3(0, 1, 0);
+import { mountPatterns, type EquipSlot } from './EquipmentLoader';
 
 /** Server keeps 2D pixel coords (x right, y down). 3D maps px → tiles: x→x, y→z. */
 export const PX_TO_UNIT = 1 / CONFIG.TILE;
@@ -113,38 +111,31 @@ abstract class PlayerBase {
 
   /**
    * Attach (or clear) an equipment mesh on a mount bone. The mesh follows the
-   * bone through animation because it's parented to it. Its own root carries
-   * the mount-local transform from Unity.
+   * bone through animation because it's parented to it. The item glb already
+   * carries the authored hold pose (baked rotation on its mesh node, in the same
+   * Unity→glTF frame as the bone), so a plain local attach reproduces the game's
+   * grip — no re-orientation. `hero` selects the head bone for hats.
    */
-  setEquipment(slot: EquipSlot, obj: THREE.Object3D | null) {
+  setEquipment(slot: EquipSlot, obj: THREE.Object3D | null, hero = '') {
     const prev = this.equipped.get(slot);
     if (prev) {
       prev.parent?.remove(prev);
       this.equipped.delete(slot);
     }
     if (!obj) return;
-    const bone = this.findBone(MOUNT_PATTERNS[slot]);
+    const bone = this.findBone(mountPatterns(hero, slot));
     if (!bone) {
       console.warn(`[player] mount bone for '${slot}' not found on this rig`);
       return;
     }
+    // Wrapper stays identity; the item's own node keeps its baked pose. Only the
+    // showcase translation was stripped at load, so this seats grip/crown on the
+    // bone exactly as Unity parented it.
+    obj.position.set(0, 0, 0);
+    obj.quaternion.identity();
+    obj.scale.set(1, 1, 1);
     bone.add(obj);
-    this.orientEquipment(obj, bone);
     this.equipped.set(slot, obj);
-  }
-
-  /**
-   * Every item is authored with its bulk along the raw mesh +Z. Point that axis
-   * at world-up so weapons stand up out of the fist and hats sit on the crown —
-   * independent of each rig's mount-bone axes (hand +Z is forward, head +X is
-   * up, panda/rabbit differ again). Computed once from the current bone pose, so
-   * the item then rides the animation naturally.
-   */
-  private orientEquipment(obj: THREE.Object3D, bone: THREE.Object3D) {
-    bone.updateWorldMatrix(true, false);
-    const boneQ = bone.getWorldQuaternion(new THREE.Quaternion());
-    const localUp = WORLD_UP.clone().applyQuaternion(boneQ.invert()).normalize();
-    obj.quaternion.setFromUnitVectors(ITEM_OUT_AXIS, localUp);
   }
 
   private findBone(patterns: RegExp[]): THREE.Object3D | null {
