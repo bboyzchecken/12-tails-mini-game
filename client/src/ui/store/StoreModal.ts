@@ -1,6 +1,7 @@
 import type { Appearance } from '@12tails/shared/events';
 import type { AppearanceControl } from '../appearanceControl';
 import { getHeroEquipment } from '../equipmentIndex';
+import { getEquipThumb } from '../EquipThumbs';
 import {
   demoStore, priceOf, rarityOf, type CosmeticType, type Rarity,
 } from './demoState';
@@ -147,7 +148,18 @@ export class StoreModal {
         (isEquip(tab) ? ' label' : '') + (this.selected === n ? ' sel' : '');
       cell.style.borderColor = this.selected === n ? '#ffd98a' : RARITY_COLOR[rarity];
       if (isEquip(tab)) {
-        cell.textContent = pretty(this.equip[tab][n]);
+        const name = this.equip[tab][n];
+        cell.title = pretty(name);
+        const label = document.createElement('span');
+        label.className = 'store-cell-label';
+        label.textContent = pretty(name); // fallback until the 3D thumb lands
+        cell.appendChild(label);
+        void getEquipThumb(hero, tab, name).then((url) => {
+          if (!url || !cell.isConnected) return;
+          label.remove();
+          cell.classList.add('thumb');
+          cell.style.backgroundImage = `url(${url})`;
+        });
       } else {
         cell.style.backgroundImage = `url(assets/cosmetics/${hero}/${tab}/${n}.png)`;
       }

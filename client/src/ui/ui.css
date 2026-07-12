@@ -787,3 +787,13 @@ body.touch .chat-input-wrap input {
   color: var(--ui-muted);
   font-size: 12px;
 }
+
+/* Equipment cells once the live 3D thumbnail lands */
+.store-cell.thumb {
+  background-color: #f6efe4;
+  background-size: cover;
+  background-position: center;
+}
+.store-cell-label {
+  pointer-events: none;
+}

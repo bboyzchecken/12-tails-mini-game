@@ -1,6 +1,7 @@
 import type { Appearance } from '@12tails/shared/events';
 import type { AppearanceControl } from './appearanceControl';
 import { getHeroEquipment } from './equipmentIndex';
+import { getEquipThumb } from './EquipThumbs';
 import { demoStore, type CosmeticType } from './store/demoState';
 
 const SWATCH = 40;
@@ -154,6 +155,11 @@ export class CustomizePanel {
       b.textContent = pretty(name).slice(0, 3);
       b.title = pretty(name);
       b.style.fontSize = '10px';
+      void getEquipThumb(hero, slot, name).then((url) => {
+        if (!url || !b.isConnected) return;
+        b.textContent = '';
+        b.style.background = `#fff url(${url}) center/cover no-repeat`;
+      });
       b.addEventListener('click', () => this.commit({ [slot]: name }));
       g.appendChild(b);
     }
