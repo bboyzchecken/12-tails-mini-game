@@ -53,7 +53,7 @@ export class ChatOverlay {
     this.input.maxLength = CONFIG.CHAT_MAX_LEN;
     this.input.placeholder = 'กด Enter เพื่อพิมพ์…';
     this.input.style.cssText =
-      'width:min(460px,88vw);padding:11px 18px;font-size:15px;color:#fff;outline:none;' +
+      'box-sizing:border-box;width:min(460px,88vw);padding:11px 18px;font-size:15px;color:#fff;outline:none;' +
       'background:rgba(20,18,30,0.62);border:1.5px solid rgba(201,164,92,0.85);' +
       'border-radius:22px;font-family:inherit;box-shadow:0 3px 12px rgba(0,0,0,0.35);' +
       'transition:border-color .15s,background .15s;';

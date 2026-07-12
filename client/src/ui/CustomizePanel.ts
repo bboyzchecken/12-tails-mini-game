@@ -46,18 +46,11 @@ export class CustomizePanel {
     this.button = document.createElement('button');
     this.button.title = 'แต่งตัว';
     this.button.textContent = '🎨';
-    this.button.style.cssText =
-      'position:fixed;top:104px;right:12px;pointer-events:auto;cursor:pointer;' +
-      'width:44px;height:44px;border-radius:50%;padding:0;font-size:20px;' +
-      'border:2px solid rgba(201,164,92,0.9);background:rgba(20,18,30,0.6);' +
-      'display:flex;align-items:center;justify-content:center;';
+    this.button.className = 'side-btn s2';
     this.button.addEventListener('click', () => (this.open ? this.close() : this.show()));
 
     this.panel = document.createElement('div');
-    this.panel.className = 'panel';
-    this.panel.style.cssText =
-      'position:fixed;top:104px;right:64px;display:none;pointer-events:auto;' +
-      'padding:12px 14px;border-radius:12px;max-height:74vh;overflow-y:auto;width:290px;';
+    this.panel.className = 'panel side-panel';
 
     this.root.append(this.panel, this.button);
     document.body.appendChild(this.root);
@@ -119,8 +112,10 @@ export class CustomizePanel {
       const owned = demoStore.isOwned(hero, type, n);
       const b = this.cell(n === selected);
       b.style.borderRadius = type === 'color' ? '50%' : '9px';
-      b.style.background =
-        `${type === 'face' ? '#fff' : 'transparent'} url(assets/cosmetics/${hero}/${type}/${n}.png) center/cover no-repeat`;
+      // face art lives in the overlay's top-left quadrant — zoom in on it
+      b.style.background = type === 'face'
+        ? `#fff url(assets/cosmetics/${hero}/${type}/${n}.png) 0 0/195% no-repeat`
+        : `transparent url(assets/cosmetics/${hero}/${type}/${n}.png) center/cover no-repeat`;
       if (!owned) this.lock(b);
       b.addEventListener('click', () => {
         if (owned) this.commit({ [type]: n });

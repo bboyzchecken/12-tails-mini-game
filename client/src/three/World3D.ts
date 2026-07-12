@@ -16,6 +16,8 @@ import { DayNightToggle, type MapVariant } from '../ui/DayNightToggle';
 import { LoadingBar } from '../ui/LoadingBar';
 import { loadCharacterAsset, buildAppearanceTexture, type CharacterAsset } from './CharacterAsset';
 import { loadEquipment, equipmentUrl, type EquipSlot } from './EquipmentLoader';
+import { trimClips } from './CharacterAsset';
+import { weaponPartner } from '../ui/equipmentIndex';
 import { LocalPlayer3D, RemotePlayer3D, PX_TO_UNIT } from './Player3D';
 import { OverheadLayer } from './Overhead';
 
@@ -366,6 +368,7 @@ export class World3D {
       // NPC idle clips shipped inside the scene — play them so the camp feels
       // alive. One mixer PER skinned NPC: a single map-wide mixer lets bones
       // with the same names cross-bind between NPCs and flings them away.
+      trimClips(gltf.animations); // same padded-tail glide as character clips
       if (gltf.animations.length) {
         const npcRoots = new Set<THREE.Object3D>();
         map.traverse((o) => {
@@ -651,10 +654,22 @@ export class World3D {
   ) {
     if (!id) {
       player.setEquipment(slot, null);
+      if (slot === 'weapon') player.setEquipment('weaponL', null);
       return;
     }
-    const obj = await loadEquipment(equipmentUrl(hero, slot, id));
+    const align = slot === 'weapon';
+    const obj = await loadEquipment(equipmentUrl(hero, slot, id), { alignLongAxis: align });
     player.setEquipment(slot, obj);
+
+    // Dual-wield heroes ship paired weapons (nameR / name_r) — equip the
+    // off-hand half automatically when the pair exists.
+    if (slot === 'weapon') {
+      const partner = await weaponPartner(hero, id);
+      const off = partner
+        ? await loadEquipment(equipmentUrl(hero, 'weapon', partner), { alignLongAxis: true })
+        : null;
+      player.setEquipment('weaponL', off);
+    }
   }
 
   /** Local player changed their look (from the customize panel): apply + broadcast. */
@@ -758,11 +773,7 @@ export class World3D {
     const btn = document.createElement('button');
     btn.title = 'ร้านค้า';
     btn.textContent = '🛒';
-    btn.style.cssText =
-      'position:fixed;top:156px;right:12px;z-index:11;pointer-events:auto;cursor:pointer;' +
-      'width:44px;height:44px;border-radius:50%;padding:0;font-size:20px;' +
-      'border:2px solid rgba(201,164,92,0.9);background:rgba(20,18,30,0.6);' +
-      'display:flex;align-items:center;justify-content:center;';
+    btn.className = 'side-btn s3';
     btn.addEventListener('click', () => this.openStore(control));
     document.body.appendChild(btn);
   }

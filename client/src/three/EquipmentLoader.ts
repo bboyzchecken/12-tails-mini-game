@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 /** Equipment slot -> the character bone it attaches to. */
-export type EquipSlot = 'weapon' | 'hat';
+export type EquipSlot = 'weapon' | 'weaponL' | 'hat';
 export const MOUNT_BONE: Record<EquipSlot, string> = {
   weapon: 'mount_Hand_R',
+  weaponL: 'mount_Hand_L', // off-hand of a dual-wield pair (R/_r variants)
   hat: 'mount_OverHead',
 };
 
@@ -32,14 +33,35 @@ export function equipmentUrl(hero: string, slot: EquipSlot, id: string): string 
  * the root by UnityGLTF). Returns a fresh clone each call so multiple players
  * can wear the same item. Null if the file is missing.
  */
-export async function loadEquipment(url: string): Promise<THREE.Group | null> {
-  let p = cache.get(url);
+/** 120° axis-swap quaternions (all components ±0.5) are showcase-scene junk. */
+function isShowcaseQuat(q: THREE.Quaternion): boolean {
+  return (
+    Math.abs(Math.abs(q.x) - 0.5) < 0.02 &&
+    Math.abs(Math.abs(q.y) - 0.5) < 0.02 &&
+    Math.abs(Math.abs(q.z) - 0.5) < 0.02 &&
+    Math.abs(Math.abs(q.w) - 0.5) < 0.02
+  );
+}
+
+export interface LoadEquipmentOptions {
+  /** Weapons: rotate so the long axis (blade/shaft) points +z, tip forward. */
+  alignLongAxis?: boolean;
+}
+
+export async function loadEquipment(
+  url: string,
+  opts: LoadEquipmentOptions = {},
+): Promise<THREE.Group | null> {
+  const key = url + (opts.alignLongAxis ? '#z' : '');
+  let p = cache.get(key);
   if (!p) {
     p = new GLTFLoader().loadAsync(bust(url)).then((gltf) => {
       gltf.scene.traverse((o) => {
         // Seat the item on the bone: drop the showcase-scene placement entirely.
         if (o.position.length() > SHOWCASE_OFFSET) {
           o.position.set(0, 0, 0);
+          o.quaternion.identity();
+        } else if (isShowcaseQuat(o.quaternion)) {
           o.quaternion.identity();
         }
         if (!(o instanceof THREE.Mesh)) return;
@@ -51,15 +73,29 @@ export async function loadEquipment(url: string): Promise<THREE.Group | null> {
           mat.side = THREE.DoubleSide;
         }
       });
+
+      if (opts.alignLongAxis) {
+        // Most weapons are authored grip-at-origin along +z; normalize the
+        // stragglers so every blade/shaft points the same way in the hand.
+        const box = new THREE.Box3().setFromObject(gltf.scene);
+        const size = box.getSize(new THREE.Vector3());
+        const max = Math.max(size.x, size.y, size.z);
+        if (max > 0) {
+          if (size.y === max && size.y > size.z * 1.2) gltf.scene.rotateX(Math.PI / 2);
+          else if (size.x === max && size.x > size.z * 1.2) gltf.scene.rotateY(-Math.PI / 2);
+          const after = new THREE.Box3().setFromObject(gltf.scene);
+          if (Math.abs(after.min.z) > Math.abs(after.max.z)) gltf.scene.rotateY(Math.PI);
+        }
+      }
       return gltf.scene;
     });
-    cache.set(url, p);
+    cache.set(key, p);
   }
   try {
     const scene = await p;
     return scene.clone(true);
   } catch {
-    cache.delete(url);
+    cache.delete(key);
     return null;
   }
 }

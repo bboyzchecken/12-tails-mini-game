@@ -6,8 +6,10 @@ import { MOUNT_BONE, type EquipSlot } from './EquipmentLoader';
 
 /** Server keeps 2D pixel coords (x right, y down). 3D maps px → tiles: x→x, y→z. */
 export const PX_TO_UNIT = 1 / CONFIG.TILE;
-/** Height above the feet where bubbles/name tags float, in world units. */
-export const HEAD_UNITS = 2.3;
+/** Fallback bubble height when a skeleton can't be measured. */
+const HEAD_UNITS_FALLBACK = 2.0;
+/** Clearance above the top of the head for name/bubble anchors. */
+const HEAD_MARGIN = 0.25;
 
 const ANIM_FADE = 0.18;
 const TURN_SPEED = 12; // rad/s toward target yaw
@@ -40,6 +42,8 @@ abstract class PlayerBase {
   moving = false;
   /** Terrain height under the feet (world units); smoothed toward each frame. */
   groundY = 0;
+  /** Where the name/bubble anchors above the feet — measured per character. */
+  private headUnits = HEAD_UNITS_FALLBACK;
 
   constructor(asset: CharacterAsset, x: number, y: number) {
     const inst: CharacterInstance = instantiateCharacter(asset);
@@ -52,6 +56,21 @@ abstract class PlayerBase {
     this.posPx.set(x, y);
     this.syncTransform(1);
     this.setAnim(false, true);
+    this.measureHead();
+  }
+
+  /** Heroes range from tall wolves to squat pandas — anchor bubbles to the
+   *  actual skeleton top instead of one fixed height. */
+  private measureHead() {
+    this.group.updateMatrixWorld(true);
+    const v = new THREE.Vector3();
+    let maxY = 0;
+    this.group.traverse((o) => {
+      if (!(o as THREE.Bone).isBone) return;
+      o.getWorldPosition(v);
+      maxY = Math.max(maxY, v.y - this.group.position.y);
+    });
+    if (maxY > 0.5) this.headUnits = maxY + HEAD_MARGIN;
   }
 
   /**
@@ -122,7 +141,7 @@ abstract class PlayerBase {
   get headPos(): THREE.Vector3 {
     return new THREE.Vector3(
       this.posPx.x * PX_TO_UNIT,
-      this.group.position.y + HEAD_UNITS,
+      this.group.position.y + this.headUnits,
       this.posPx.y * PX_TO_UNIT,
     );
   }

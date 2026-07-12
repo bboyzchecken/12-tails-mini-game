@@ -76,9 +76,41 @@ function sanitizeClips(clips: THREE.AnimationClip[]) {
   }
 }
 
+/**
+ * Ripped clips are padded to fixed lengths (run_10: motion ends at 0.533s but
+ * the clip lasts 1.0s) — the mixer then glides through the dead tail every
+ * loop, which reads as "floating" between walk cycles. Trim each clip's
+ * duration to its last real keyframe change.
+ */
+export function trimClips(clips: THREE.AnimationClip[]) {
+  for (const clip of clips) {
+    let last = 0;
+    for (const track of clip.tracks) {
+      const t = track.times;
+      const v = track.values;
+      const stride = t.length > 0 ? v.length / t.length : 0;
+      for (let i = t.length - 1; i > 0; i--) {
+        let changed = false;
+        for (let s = 0; s < stride; s++) {
+          if (Math.abs(v[i * stride + s] - v[(i - 1) * stride + s]) > 1e-5) {
+            changed = true;
+            break;
+          }
+        }
+        if (changed) {
+          if (t[i] > last) last = t[i];
+          break;
+        }
+      }
+    }
+    if (last > 0.1 && clip.duration - last > 0.05) clip.duration = last;
+  }
+}
+
 async function load(src: CharacterModelSource): Promise<CharacterAsset> {
   const gltf = await new GLTFLoader().loadAsync(bust(src.model));
   sanitizeClips(gltf.animations);
+  trimClips(gltf.animations);
   // Some prefab roots were ripped where they stood in a scene (Bison sat ~90
   // units away and rendered far from its nameplate) — recentre at the origin.
   for (const child of gltf.scene.children) {
