@@ -44,8 +44,45 @@ function bust(url: string): string {
   return import.meta.env.DEV ? `${url}?t=${Date.now()}` : url;
 }
 
+/**
+ * Some ripped clips carry the ABSOLUTE world position of wherever they were
+ * captured (bison's root_74 teleports the model ~90 units away — invisible in
+ * game). Rebase any position track whose average offset is implausibly far
+ * from the rig so the motion stays but the offset goes.
+ */
+const MAX_TRACK_OFFSET = 10; // world units — bone locals are all well below this
+
+function sanitizeClips(clips: THREE.AnimationClip[]) {
+  for (const clip of clips) {
+    for (const track of clip.tracks) {
+      if (!track.name.endsWith('.position')) continue;
+      const v = track.values;
+      let mx = 0, my = 0, mz = 0;
+      const n = v.length / 3;
+      for (let i = 0; i < v.length; i += 3) {
+        mx += v[i]; my += v[i + 1]; mz += v[i + 2];
+      }
+      if (Math.hypot(mx / n, my / n, mz / n) < MAX_TRACK_OFFSET) continue;
+      const bx = v[0], by = v[1], bz = v[2];
+      for (let i = 0; i < v.length; i += 3) {
+        v[i] -= bx; v[i + 1] -= by; v[i + 2] -= bz;
+      }
+      console.log(`[asset] rebased runaway position track in clip '${clip.name}'`);
+    }
+  }
+}
+
 async function load(src: CharacterModelSource): Promise<CharacterAsset> {
   const gltf = await new GLTFLoader().loadAsync(bust(src.model));
+  sanitizeClips(gltf.animations);
+  // Some prefab roots were ripped where they stood in a scene (Bison sat ~90
+  // units away and rendered far from its nameplate) — recentre at the origin.
+  for (const child of gltf.scene.children) {
+    if (child.position.length() > 10) {
+      console.log(`[asset] recentred root '${child.name}' (was ${child.position.toArray().map((n) => n.toFixed(1))})`);
+      child.position.set(0, 0, 0);
+    }
+  }
   const faceOverlay = await loadImage(bust(src.overlay)).catch(() => null);
 
   gltf.scene.traverse((obj) => {

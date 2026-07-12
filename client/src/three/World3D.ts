@@ -8,6 +8,7 @@ import { gameToUI, uiToGame } from '../ui/bus';
 import { ChatOverlay } from '../ui/ChatOverlay';
 import { EmotePanel } from '../ui/EmotePanel';
 import { DayNightToggle, type MapVariant } from '../ui/DayNightToggle';
+import { LoadingBar } from '../ui/LoadingBar';
 import { loadCharacterAsset, type CharacterAsset } from './CharacterAsset';
 import { LocalPlayer3D, RemotePlayer3D, PX_TO_UNIT } from './Player3D';
 import { OverheadLayer } from './Overhead';
@@ -41,8 +42,8 @@ const MAP_VARIANTS: Record<MapVariant, MapVariantDef> = {
   },
   night: {
     url: 'assets/models/map-night.glb',
-    bg: 0x111a30, hemiSky: 0x8fa3d9, hemiGround: 0x2c3350, hemiIntensity: 0.95,
-    sunColor: 0xb8ccff, sunIntensity: 0.55, groundColor: 0x2f4a3a,
+    bg: 0x1c2a4a, hemiSky: 0xaebde8, hemiGround: 0x3a4468, hemiIntensity: 1.45,
+    sunColor: 0xc4d4ff, sunIntensity: 0.85, groundColor: 0x3a5a48,
   },
 };
 
@@ -129,8 +130,9 @@ export class World3D {
   private groundMat!: THREE.MeshLambertMaterial;
   private mapVariant: MapVariant = DEFAULT_MAP_VARIANT;
   private mapGroups = new Map<MapVariant, THREE.Group | 'loading'>();
-  private mapMixers = new Map<MapVariant, THREE.AnimationMixer>();
+  private mapMixers = new Map<MapVariant, THREE.AnimationMixer[]>();
   private dayNight!: DayNightToggle;
+  private loading = new LoadingBar();
   private walkmask: Walkmask | null = null;
   private groundRay = new THREE.Raycaster();
   private static readonly DOWN = new THREE.Vector3(0, -1, 0);
@@ -139,11 +141,14 @@ export class World3D {
 
   async start() {
     this.selfDef = getCharacter(this.init.characterId) ?? CHARACTERS[0];
+    this.loading.show(`กำลังโหลดตัวละคร ${this.selfDef.name}…`);
     try {
       this.asset = await loadCharacterAsset(this.selfDef);
     } catch (err) {
       console.error('[world3d] FAILED to load own model', this.selfDef.model, err);
       throw err;
+    } finally {
+      this.loading.hide();
     }
     this.setupRenderer();
     this.setupWorld();
@@ -290,8 +295,14 @@ export class World3D {
   private async loadMap(v: MapVariant) {
     const def = MAP_VARIANTS[v];
     this.mapGroups.set(v, 'loading');
+    this.loading.show(v === 'night' ? 'กำลังโหลดแมพกลางคืน…' : 'กำลังโหลดแมพกลางวัน…');
     try {
-      const gltf = await new GLTFLoader().loadAsync(bust(def.url));
+      const gltf = await new Promise<Awaited<ReturnType<GLTFLoader['loadAsync']>>>(
+        (resolve, reject) =>
+          new GLTFLoader().load(bust(def.url), resolve, (e) => {
+            if (e.total > 0) this.loading.progress(e.loaded / e.total);
+          }, reject),
+      );
       const map = gltf.scene;
       map.position.copy(MAP_OFFSET);
       map.traverse((obj) => {
@@ -315,12 +326,46 @@ export class World3D {
       this.mapGroups.set(v, map);
       this.scene.add(map);
 
-      // NPC idle clips shipped inside the scene — play them all so the camp
-      // feels alive instead of T-posing statues.
+      // NPC idle clips shipped inside the scene — play them so the camp feels
+      // alive. One mixer PER skinned NPC: a single map-wide mixer lets bones
+      // with the same names cross-bind between NPCs and flings them away.
       if (gltf.animations.length) {
-        const mixer = new THREE.AnimationMixer(map);
-        for (const clip of gltf.animations) mixer.clipAction(clip).play();
-        this.mapMixers.set(v, mixer);
+        const npcRoots = new Set<THREE.Object3D>();
+        map.traverse((o) => {
+          const sk = o as THREE.SkinnedMesh;
+          if (!sk.isSkinnedMesh) return;
+          // NPC unit = nearest common ancestor of the mesh and its skeleton.
+          // (Scene containers like 'SceneObjects' hold ALL the NPCs — climbing
+          // to the top lumped 5 NPCs into one and froze the rest.)
+          const ancestors = new Set<THREE.Object3D>();
+          for (let n: THREE.Object3D | null = sk; n && n !== map; n = n.parent) ancestors.add(n);
+          let b: THREE.Object3D | null = sk.skeleton?.bones[0] ?? null;
+          while (b && !ancestors.has(b)) b = b.parent;
+          npcRoots.add(b ?? sk);
+        });
+        const mixers: THREE.AnimationMixer[] = [];
+        for (const rootObj of npcRoots) {
+          const names = new Set<string>();
+          rootObj.traverse((o) => names.add(o.name));
+          // Pick ONE clip per NPC — the best skeleton match, idle clips first.
+          // (Playing several at once blends them into mush; a too-strict match
+          // threshold left most NPCs frozen.)
+          let best: { clip: THREE.AnimationClip; score: number } | null = null;
+          for (const clip of gltf.animations) {
+            const trackNodes = clip.tracks.map((t) => t.name.split('.')[0]);
+            const matched = trackNodes.filter((nm) => names.has(nm)).length;
+            const ratio = matched / Math.max(1, trackNodes.length);
+            if (ratio < 0.25) continue;
+            const score = ratio + (/root|idle/i.test(clip.name) ? 1 : 0);
+            if (!best || score > best.score) best = { clip, score };
+          }
+          if (!best) continue;
+          const mixer = new THREE.AnimationMixer(rootObj);
+          mixer.clipAction(best.clip).play();
+          mixers.push(mixer);
+        }
+        if (mixers.length) this.mapMixers.set(v, mixers);
+        console.log(`[world3d] map '${v}': animating ${mixers.length} NPC(s)`);
       }
       const box = new THREE.Box3().setFromObject(map);
       console.log(
@@ -331,6 +376,8 @@ export class World3D {
     } catch {
       this.mapGroups.delete(v);
       console.log(`[world3d] no map at ${def.url} — placeholder ground only`);
+    } finally {
+      this.loading.hide();
     }
   }
 
@@ -566,7 +613,7 @@ export class World3D {
       r.groundY = this.sampleGroundY(r.posPx.x, r.posPx.y);
       r.update(dt);
     }
-    this.mapMixers.get(this.mapVariant)?.update(dt);
+    for (const m of this.mapMixers.get(this.mapVariant) ?? []) m.update(dt);
 
     // Camera: smooth-follow at a fixed 3/4 angle.
     const p = this.player.group.position;
