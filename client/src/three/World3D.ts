@@ -8,6 +8,9 @@ import { gameToUI, uiToGame } from '../ui/bus';
 import { ChatOverlay } from '../ui/ChatOverlay';
 import { EmotePanel } from '../ui/EmotePanel';
 import { CustomizePanel } from '../ui/CustomizePanel';
+import { StoreModal } from '../ui/store/StoreModal';
+import { demoStore } from '../ui/store/demoState';
+import type { AppearanceControl } from '../ui/appearanceControl';
 import { DayNightToggle, type MapVariant } from '../ui/DayNightToggle';
 import { LoadingBar } from '../ui/LoadingBar';
 import { loadCharacterAsset, buildAppearanceTexture, type CharacterAsset } from './CharacterAsset';
@@ -17,7 +20,6 @@ import { OverheadLayer } from './Overhead';
 /** ชื่อแมพบน HUD (ค่าเดิมจาก WorldScene — ย้ายไป map data เมื่อมีหลายแมพ) */
 const MAP_NAME = 'ค่ายมือใหม่';
 const DEMO_SELF = { level: 1, xp: 20, xpMax: 100 };
-const DEMO_WALLET = { jil: 1200, coins: 300 };
 
 const CAMERA_LOOK_UP = 1.1; // look slightly above the feet
 const GROUND_SIZE = 220;    // tiles (= world units)
@@ -182,11 +184,17 @@ export class World3D {
       initial: DEFAULT_MAP_VARIANT,
       onChange: (v) => this.setMapVariant(v),
     });
-    this.customize = new CustomizePanel({
+    const control: AppearanceControl = {
       characterId: this.selfDef.id,
-      initial: this.appearance,
-      onChange: (a) => this.setSelfAppearance(a),
+      get: () => this.appearance,
+      preview: (a) => void this.applyAppearance(this.player, this.selfDef.id, a),
+      commit: (a) => this.setSelfAppearance(a),
+    };
+    this.customize = new CustomizePanel({
+      control,
+      onOpenStore: () => this.openStore(control),
     });
+    this.makeStoreButton(control);
     this.renderer.setAnimationLoop(() => this.tick());
   }
 
@@ -407,6 +415,11 @@ export class World3D {
   }
 
   private setupPlayer() {
+    // The look chosen at character select is a free starter — mark it owned so
+    // the customize panel treats it as equippable (the store sells the rest).
+    demoStore.grant(this.selfDef.id, 'color', this.appearance.color);
+    demoStore.grant(this.selfDef.id, 'face', this.appearance.face);
+
     this.player = new LocalPlayer3D(this.asset, CONFIG.SPAWN.x, CONFIG.SPAWN.y);
     void this.applyAppearance(this.player, this.selfDef.id, this.appearance);
     this.scene.add(this.player.group);
@@ -669,6 +682,31 @@ export class World3D {
     this.socket.on('emote:played', onEmote);
   }
 
+  // -------------------------------------------------------------- demo store
+
+  private storeOpen = false;
+
+  private openStore(control: AppearanceControl) {
+    if (this.storeOpen) return;
+    this.storeOpen = true;
+    const modal = new StoreModal(control);
+    const origDestroy = modal.destroy.bind(modal);
+    modal.destroy = () => { origDestroy(); this.storeOpen = false; };
+  }
+
+  private makeStoreButton(control: AppearanceControl) {
+    const btn = document.createElement('button');
+    btn.title = 'ร้านค้า';
+    btn.textContent = '🛒';
+    btn.style.cssText =
+      'position:fixed;top:156px;right:12px;z-index:11;pointer-events:auto;cursor:pointer;' +
+      'width:44px;height:44px;border-radius:50%;padding:0;font-size:20px;' +
+      'border:2px solid rgba(201,164,92,0.9);background:rgba(20,18,30,0.6);' +
+      'display:flex;align-items:center;justify-content:center;';
+    btn.addEventListener('click', () => this.openStore(control));
+    document.body.appendChild(btn);
+  }
+
   // ------------------------------------------------------------- UI bridge
 
   private setupUIBridge() {
@@ -678,7 +716,7 @@ export class World3D {
       name: this.init.name,
       ...DEMO_SELF,
     });
-    gameToUI.emit('player:currency', DEMO_WALLET);
+    demoStore.emitCurrency(); // Jil/coins come from the demo wallet (persisted)
     this.emitOnline();
 
     uiToGame.on('music:toggle', () => {
