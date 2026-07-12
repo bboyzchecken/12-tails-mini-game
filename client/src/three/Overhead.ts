@@ -2,6 +2,20 @@ import * as THREE from 'three';
 import { CONFIG } from '@12tails/shared/config';
 
 const EMOTE_ICON = 48; // px, on-screen emote face size
+const BUBBLE_BG = 'rgba(255,255,255,0.96)';
+
+/** Inject the speech-bubble tail rule once. */
+function ensureBubbleStyle() {
+  if (document.getElementById('tt-bubble-style')) return;
+  const st = document.createElement('style');
+  st.id = 'tt-bubble-style';
+  st.textContent =
+    `.tt-bubble{position:relative}` +
+    `.tt-bubble::after{content:'';position:absolute;left:50%;bottom:-8px;` +
+    `transform:translateX(-50%);border:8px solid transparent;border-bottom:0;` +
+    `border-top-color:${BUBBLE_BG};filter:drop-shadow(0 2px 1px rgba(0,0,0,0.18))}`;
+  document.head.appendChild(st);
+}
 
 /**
  * DOM layer for per-player overheads (name tag, chat bubble, emote face),
@@ -74,12 +88,14 @@ class Overhead {
       'background-color:rgba(255,255,255,0.95);border:2px solid rgba(185,185,198,0.9);' +
       'background-repeat:no-repeat;';
 
+    ensureBubbleStyle();
     this.bubble = document.createElement('div');
+    this.bubble.className = 'tt-bubble';
     this.bubble.style.cssText =
-      'display:none;max-width:200px;padding:5px 10px;border-radius:10px;' +
-      'background:rgba(255,255,255,0.94);color:#1c1c2e;font-size:13px;line-height:1.3;' +
+      'display:none;max-width:220px;margin-bottom:5px;padding:7px 13px;border-radius:14px;' +
+      `background:${BUBBLE_BG};color:#2a2038;font-size:14px;line-height:1.35;font-weight:500;` +
       'white-space:pre-wrap;word-break:break-word;text-align:center;' +
-      'box-shadow:0 1px 4px rgba(0,0,0,0.35);';
+      'box-shadow:0 2px 8px rgba(0,0,0,0.28);';
 
     const tag = document.createElement('div');
     tag.textContent = name;

@@ -53,9 +53,18 @@ export class ChatOverlay {
     this.input.maxLength = CONFIG.CHAT_MAX_LEN;
     this.input.placeholder = 'กด Enter เพื่อพิมพ์…';
     this.input.style.cssText =
-      'width:300px;padding:7px 12px;font-size:13px;color:#fff;outline:none;' +
-      'background:rgba(20,18,30,0.55);border:1px solid rgba(201,164,92,0.8);' +
-      'border-radius:8px;font-family:inherit;';
+      'width:min(460px,88vw);padding:11px 18px;font-size:15px;color:#fff;outline:none;' +
+      'background:rgba(20,18,30,0.62);border:1.5px solid rgba(201,164,92,0.85);' +
+      'border-radius:22px;font-family:inherit;box-shadow:0 3px 12px rgba(0,0,0,0.35);' +
+      'transition:border-color .15s,background .15s;';
+    this.input.addEventListener('focus', () => {
+      this.input.style.borderColor = '#ffd98a';
+      this.input.style.background = 'rgba(28,24,40,0.85)';
+    });
+    this.input.addEventListener('blur', () => {
+      this.input.style.borderColor = 'rgba(201,164,92,0.85)';
+      this.input.style.background = 'rgba(20,18,30,0.62)';
+    });
 
     this.input.addEventListener('keydown', (e) => {
       e.stopPropagation(); // keep WASD/arrows from reaching Phaser while typing

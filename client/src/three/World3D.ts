@@ -18,9 +18,16 @@ const MAP_NAME = 'ค่ายมือใหม่';
 const DEMO_SELF = { level: 1, xp: 20, xpMax: 100 };
 const DEMO_WALLET = { jil: 1200, coins: 300 };
 
-const CAMERA_OFFSET = new THREE.Vector3(0, 8, 7.5);
 const CAMERA_LOOK_UP = 1.1; // look slightly above the feet
 const GROUND_SIZE = 220;    // tiles (= world units)
+
+// Orbit camera limits (drag to rotate, wheel to zoom).
+const CAM_DIST_MIN = 4;
+const CAM_DIST_MAX = 24;
+const CAM_PITCH_MIN = 0.18; // near-horizontal
+const CAM_PITCH_MAX = 1.45; // near-top-down
+const CAM_ROTATE_SPEED = 0.008;
+const CAM_ZOOM_SPEED = 0.0016;
 
 interface MapVariantDef {
   url: string;
@@ -120,6 +127,12 @@ export class World3D {
   private keys = new Set<string>();
   private inputEnabled = true;
   private moveInput = new THREE.Vector2();
+  // Orbit camera state (spherical around the player).
+  private camYaw = 0;
+  private camPitch = 0.82;
+  private camDist = 11;
+  private dragging = false;
+  private lastPointer = { x: 0, y: 0 };
   private sendAccum = 0;
   private lastSent: SentState | null = null;
 
@@ -388,8 +401,18 @@ export class World3D {
 
     // Start the camera snapped to the player.
     const p = this.player.group.position;
-    this.camera.position.copy(p).add(CAMERA_OFFSET);
+    this.camera.position.copy(p).add(this.camOffset());
     this.camera.lookAt(p.x, p.y + CAMERA_LOOK_UP, p.z);
+  }
+
+  /** Camera offset from the player, from the current orbit (yaw/pitch/dist). */
+  private camOffset(): THREE.Vector3 {
+    const cp = Math.cos(this.camPitch);
+    return new THREE.Vector3(
+      Math.sin(this.camYaw) * cp * this.camDist,
+      Math.sin(this.camPitch) * this.camDist,
+      Math.cos(this.camYaw) * cp * this.camDist,
+    );
   }
 
   // ---------------------------------------------------------------- input
@@ -398,6 +421,34 @@ export class World3D {
     window.addEventListener('keydown', (e) => this.keys.add(e.code));
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear());
+
+    // Drag to orbit the camera, wheel to zoom.
+    const canvas = this.renderer.domElement;
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('pointerdown', (e) => {
+      this.dragging = true;
+      this.lastPointer = { x: e.clientX, y: e.clientY };
+      canvas.setPointerCapture(e.pointerId);
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!this.dragging) return;
+      this.camYaw -= (e.clientX - this.lastPointer.x) * CAM_ROTATE_SPEED;
+      this.camPitch = Math.min(
+        CAM_PITCH_MAX,
+        Math.max(CAM_PITCH_MIN, this.camPitch + (e.clientY - this.lastPointer.y) * CAM_ROTATE_SPEED),
+      );
+      this.lastPointer = { x: e.clientX, y: e.clientY };
+    });
+    const endDrag = () => (this.dragging = false);
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      this.camDist = Math.min(
+        CAM_DIST_MAX,
+        Math.max(CAM_DIST_MIN, this.camDist * (1 + e.deltaY * CAM_ZOOM_SPEED)),
+      );
+    }, { passive: false });
 
     // Dev aid: press P to print where you stand — walk to a good spot, send the
     // numbers, and CONFIG.SPAWN gets pinned there.
@@ -607,17 +658,24 @@ export class World3D {
     const dt = Math.min(this.clock.getDelta(), 0.05);
 
     this.readMoveInput();
+    // Movement is camera-relative: screen-up always walks away from the camera.
+    const cy = Math.cos(this.camYaw);
+    const sy = Math.sin(this.camYaw);
+    const worldInput = new THREE.Vector2(
+      this.moveInput.x * cy + this.moveInput.y * sy,
+      -this.moveInput.x * sy + this.moveInput.y * cy,
+    );
     this.player.groundY = this.sampleGroundY(this.player.posPx.x, this.player.posPx.y);
-    this.player.update(dt, this.moveInput, this.canWalkPx);
+    this.player.update(dt, worldInput, this.canWalkPx);
     for (const r of this.remotes.values()) {
       r.groundY = this.sampleGroundY(r.posPx.x, r.posPx.y);
       r.update(dt);
     }
     for (const m of this.mapMixers.get(this.mapVariant) ?? []) m.update(dt);
 
-    // Camera: smooth-follow at a fixed 3/4 angle.
+    // Camera: smooth-follow at the current orbit angle.
     const p = this.player.group.position;
-    const wanted = new THREE.Vector3().copy(p).add(CAMERA_OFFSET);
+    const wanted = new THREE.Vector3().copy(p).add(this.camOffset());
     this.camera.position.lerp(wanted, 1 - Math.pow(0.0001, dt));
     this.camera.lookAt(p.x, p.y + CAMERA_LOOK_UP, p.z);
 
