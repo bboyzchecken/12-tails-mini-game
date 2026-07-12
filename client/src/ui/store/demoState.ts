@@ -9,7 +9,7 @@ import { gameToUI } from '../bus';
  * Cosmetic id = `${heroId}:${type}:${index}` (type = 'color' | 'face').
  */
 
-export type CosmeticType = 'color' | 'face';
+export type CosmeticType = 'color' | 'face' | 'weapon' | 'hat';
 export type Rarity = 'common' | 'rare' | 'epic';
 
 const STORAGE_KEY = '12tails-demo-store-v1';
@@ -25,16 +25,18 @@ export function cosmeticId(hero: string, type: CosmeticType, index: number): str
   return `${hero}:${type}:${index}`;
 }
 
-/** Index 0 of each type is the free starter look — owned from the start. */
-function isFree(_type: CosmeticType, index: number): boolean {
-  return index === 0;
+/** The starter look (color/face index 0) is free/owned; equipment is not. */
+function isFree(type: CosmeticType, index: number): boolean {
+  return (type === 'color' || type === 'face') && index === 0;
 }
 
 /** Mock price in Jil (0 = free/owned by default). */
 export function priceOf(type: CosmeticType, index: number): number {
   if (isFree(type, index)) return 0;
   if (type === 'color') return [0, 250, 400, 700, 1200][index] ?? 500;
-  return 120 + index * 40; // faces climb gently
+  if (type === 'face') return 120 + index * 40; // faces climb gently
+  if (type === 'weapon') return 350 + index * 45; // held gear costs more
+  return 200 + index * 35; // hats
 }
 
 export function rarityOf(type: CosmeticType, index: number): Rarity {

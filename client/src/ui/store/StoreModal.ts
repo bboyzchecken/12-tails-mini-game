@@ -1,5 +1,6 @@
 import type { Appearance } from '@12tails/shared/events';
 import type { AppearanceControl } from '../appearanceControl';
+import { getHeroEquipment } from '../equipmentIndex';
 import {
   demoStore, priceOf, rarityOf, type CosmeticType, type Rarity,
 } from './demoState';
@@ -12,12 +13,24 @@ const RARITY_COLOR: Record<Rarity, string> = {
 const TABS: { key: CosmeticType; label: string }[] = [
   { key: 'color', label: 'สี' },
   { key: 'face', label: 'หน้า' },
+  { key: 'weapon', label: 'อาวุธ' },
+  { key: 'hat', label: 'หมวก' },
 ];
+const NONE = -1; // "no item" selection for equipment slots
+
+function isEquip(t: CosmeticType): t is 'weapon' | 'hat' {
+  return t === 'weapon' || t === 'hat';
+}
+
+/** camelCase glb name -> readable label. */
+function pretty(name: string): string {
+  return name.replace(/([a-z])([A-Z0-9])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
+}
 
 /**
- * DEMO cosmetic shop (12tails-demo-monetization-plan.md): buy body colors /
- * faces with mock Jil, preview them live on your character before buying, and
- * reset anytime. Every buy/top-up is labelled "(demo)" — no real money.
+ * DEMO cosmetic shop: buy body colors / faces / weapons / hats with mock Jil,
+ * preview them live on your character before buying, reset anytime. Every
+ * buy/top-up is labelled "(demo)" — no real money.
  */
 export class StoreModal {
   private root: HTMLDivElement;
@@ -25,9 +38,9 @@ export class StoreModal {
   private action!: HTMLDivElement;
   private jilLabel!: HTMLSpanElement;
   private tab: CosmeticType = 'color';
-  private counts: Record<CosmeticType, number> = { color: 1, face: 1 };
+  private cosmeticCounts: Record<'color' | 'face', number> = { color: 1, face: 1 };
+  private equip: Record<'weapon' | 'hat', string[]> = { weapon: [], hat: [] };
   private selected = 0;
-  /** The player's truly-equipped look; previews revert to this on close. */
   private equipped: Appearance;
   private unsub: () => void;
 
@@ -39,7 +52,7 @@ export class StoreModal {
     this.root.className = 'store-modal';
     this.root.innerHTML = LAYOUT;
     this.root.addEventListener('click', (e) => {
-      if (e.target === this.root) this.close(); // click backdrop
+      if (e.target === this.root) this.close();
     });
     document.body.appendChild(this.root);
 
@@ -54,10 +67,9 @@ export class StoreModal {
     (this.root.querySelector('.store-reset') as HTMLButtonElement)
       .addEventListener('click', () => {
         demoStore.reset();
-        // revert the character to the free starter look
-        this.equipped = { color: 0, face: 0 };
+        this.equipped = { color: 0, face: 0, weapon: null, hat: null };
         this.control.commit(this.equipped);
-        this.selected = 0;
+        this.selected = this.equippedIndex();
         this.render();
       });
 
@@ -69,7 +81,7 @@ export class StoreModal {
       b.dataset.key = t.key;
       b.addEventListener('click', () => {
         this.tab = t.key;
-        this.selected = this.equipped[t.key];
+        this.selected = this.equippedIndex();
         this.render();
       });
       tabRow.appendChild(b);
@@ -83,15 +95,33 @@ export class StoreModal {
     try {
       const idx = await (await fetch('assets/cosmetics/index.json')).json();
       const c = idx[this.control.characterId];
-      if (c) this.counts = { color: Math.max(1, c.colors), face: Math.max(1, c.faces) };
+      if (c) this.cosmeticCounts = { color: Math.max(1, c.colors), face: Math.max(1, c.faces) };
     } catch {
       /* keep defaults */
     }
+    this.equip = await getHeroEquipment(this.control.characterId);
     this.render();
   }
 
+  private count(): number {
+    return isEquip(this.tab) ? this.equip[this.tab].length : this.cosmeticCounts[this.tab];
+  }
+
+  /** Appearance value this tab's index maps to (number for color/face, name|null for equipment). */
+  private valueAt(index: number): number | string | null {
+    if (!isEquip(this.tab)) return index;
+    return index < 0 ? null : this.equip[this.tab][index];
+  }
+
+  /** Which grid index is currently equipped for this tab (NONE for an empty slot). */
+  private equippedIndex(): number {
+    if (!isEquip(this.tab)) return this.equipped[this.tab];
+    const cur = this.equipped[this.tab];
+    return cur ? this.equip[this.tab].indexOf(cur) : NONE;
+  }
+
   private candidate(): Appearance {
-    return { ...this.equipped, [this.tab]: this.selected };
+    return { ...this.equipped, [this.tab]: this.valueAt(this.selected) } as Appearance;
   }
 
   private render() {
@@ -100,17 +130,27 @@ export class StoreModal {
       el.classList.toggle('on', el.dataset.key === this.tab));
 
     const hero = this.control.characterId;
+    const tab = this.tab;
     this.grid.replaceChildren();
-    for (let n = 0; n < this.counts[this.tab]; n++) {
-      const owned = demoStore.isOwned(hero, this.tab, n);
-      const equipped = this.equipped[this.tab] === n;
-      const rarity = rarityOf(this.tab, n);
+
+    // Equipment slots get a "none / unequip" cell first.
+    if (isEquip(tab)) this.grid.appendChild(this.noneCell());
+
+    for (let n = 0; n < this.count(); n++) {
+      const owned = demoStore.isOwned(hero, tab, n);
+      const equipped = this.equippedIndex() === n;
+      const rarity = rarityOf(tab, n);
 
       const cell = document.createElement('button');
       cell.className =
-        'store-cell' + (this.tab === 'face' ? ' face' : '') + (this.selected === n ? ' sel' : '');
+        'store-cell' + (tab === 'face' ? ' face' : '') +
+        (isEquip(tab) ? ' label' : '') + (this.selected === n ? ' sel' : '');
       cell.style.borderColor = this.selected === n ? '#ffd98a' : RARITY_COLOR[rarity];
-      cell.style.backgroundImage = `url(assets/cosmetics/${hero}/${this.tab}/${n}.png)`;
+      if (isEquip(tab)) {
+        cell.textContent = pretty(this.equip[tab][n]);
+      } else {
+        cell.style.backgroundImage = `url(assets/cosmetics/${hero}/${tab}/${n}.png)`;
+      }
       const badge = document.createElement('span');
       badge.className = 'store-badge';
       badge.textContent = equipped ? '✓' : owned ? '●' : `${priceOf(this.tab, n)}`;
@@ -118,7 +158,7 @@ export class StoreModal {
       cell.appendChild(badge);
       cell.addEventListener('click', () => {
         this.selected = n;
-        this.control.preview(this.candidate()); // try before you buy
+        this.control.preview(this.candidate());
         this.render();
       });
       this.grid.appendChild(cell);
@@ -127,44 +167,83 @@ export class StoreModal {
     this.renderAction();
   }
 
+  private noneCell(): HTMLButtonElement {
+    const cell = document.createElement('button');
+    cell.className = 'store-cell label none' + (this.selected === NONE ? ' sel' : '');
+    cell.textContent = 'ไม่มี';
+    cell.style.borderColor = this.selected === NONE ? '#ffd98a' : 'var(--panel-line)';
+    if (this.equippedIndex() === NONE) {
+      const badge = document.createElement('span');
+      badge.className = 'store-badge';
+      badge.textContent = '✓';
+      badge.style.background = '#5aa563';
+      cell.appendChild(badge);
+    }
+    cell.addEventListener('click', () => {
+      this.selected = NONE;
+      this.control.preview(this.candidate());
+      this.render();
+    });
+    return cell;
+  }
+
   private renderAction() {
     const hero = this.control.characterId;
     const n = this.selected;
+    this.action.replaceChildren();
+
+    // "none" for an equipment slot is always free to equip (unequip).
+    if (isEquip(this.tab) && n === NONE) {
+      const btn = this.actionButton(this.equippedIndex() === NONE ? 'ถอดอยู่' : 'ถอดออก',
+        this.equippedIndex() === NONE, () => this.equip_());
+      this.action.append(this.actionInfo('ไม่ถือ/ไม่สวม'), btn);
+      return;
+    }
+
     const owned = demoStore.isOwned(hero, this.tab, n);
-    const equipped = this.equipped[this.tab] === n;
+    const equipped = this.equippedIndex() === n;
     const price = priceOf(this.tab, n);
     const rarity = rarityOf(this.tab, n);
+    const label = isEquip(this.tab)
+      ? pretty(this.equip[this.tab][n])
+      : `${TABS.find((t) => t.key === this.tab)!.label} #${n}`;
 
-    this.action.replaceChildren();
+    let btn: HTMLButtonElement;
+    if (equipped) btn = this.actionButton('ใส่อยู่', true, () => {});
+    else if (owned) btn = this.actionButton('ใส่', false, () => this.equip_());
+    else if (demoStore.canAfford(this.tab, n)) {
+      btn = this.actionButton(`แลก ${price.toLocaleString('th-TH')} 💎 (demo)`, false, () => {
+        if (demoStore.buy(hero, this.tab, n)) this.equip_();
+      });
+    } else {
+      btn = this.actionButton(`Jil ไม่พอ (${price.toLocaleString('th-TH')})`, true, () => {});
+    }
 
     const info = document.createElement('div');
     info.className = 'store-info';
     info.innerHTML =
       `<span class="store-rar" style="color:${RARITY_COLOR[rarity]}">${rarity}</span>` +
-      `<span>${TABS.find((t) => t.key === this.tab)!.label} #${n}</span>`;
-
-    const btn = document.createElement('button');
-    btn.className = 'btn store-buy';
-    if (equipped) {
-      btn.textContent = 'ใส่อยู่';
-      btn.disabled = true;
-    } else if (owned) {
-      btn.textContent = 'ใส่';
-      btn.addEventListener('click', () => this.equip());
-    } else if (demoStore.canAfford(this.tab, n)) {
-      btn.textContent = `แลก ${price.toLocaleString('th-TH')} 💎 (demo)`;
-      btn.addEventListener('click', () => {
-        if (demoStore.buy(hero, this.tab, n)) this.equip();
-      });
-    } else {
-      btn.textContent = `Jil ไม่พอ (${price.toLocaleString('th-TH')})`;
-      btn.disabled = true;
-    }
-
+      `<span>${label}</span>`;
     this.action.append(info, btn);
   }
 
-  private equip() {
+  private actionInfo(text: string): HTMLDivElement {
+    const info = document.createElement('div');
+    info.className = 'store-info';
+    info.innerHTML = `<span>${text}</span>`;
+    return info;
+  }
+
+  private actionButton(text: string, disabled: boolean, onClick: () => void): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = 'btn store-buy';
+    btn.textContent = text;
+    btn.disabled = disabled;
+    if (!disabled) btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  private equip_() {
     this.equipped = this.candidate();
     this.control.commit(this.equipped);
     this.render();

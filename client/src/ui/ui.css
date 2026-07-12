@@ -769,3 +769,21 @@ body.touch .chat-input-wrap input {
   width: 100% !important;
   min-width: 0;
 }
+
+/* Store cells that show an item NAME (weapons/hats have no 2D thumbnail) */
+.store-cell.label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px;
+  font-size: 10px;
+  line-height: 1.15;
+  color: var(--ui-ink);
+  background: rgba(255, 255, 255, 0.5);
+  word-break: break-word;
+}
+.store-cell.none {
+  color: var(--ui-muted);
+  font-size: 12px;
+}

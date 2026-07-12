@@ -1,5 +1,6 @@
 import type { Appearance } from '@12tails/shared/events';
 import type { AppearanceControl } from './appearanceControl';
+import { getHeroEquipment } from './equipmentIndex';
 import { demoStore, type CosmeticType } from './store/demoState';
 
 const SWATCH = 40;
@@ -13,9 +14,13 @@ interface CustomizePanelOptions {
   onOpenStore: () => void;
 }
 
+function pretty(name: string): string {
+  return name.replace(/([a-z])([A-Z0-9])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
+}
+
 /**
- * Live equip panel (DOM overlay): swap between the body colors + faces you
- * OWN. Locked (unowned) items show 🔒 and open the store. Equipping commits +
+ * Live equip panel (DOM overlay): swap between the colors/faces/weapons/hats
+ * you OWN. Locked items show 🔒 and open the store. Equipping commits +
  * broadcasts through the appearance control so everyone sees it.
  */
 export class CustomizePanel {
@@ -24,6 +29,7 @@ export class CustomizePanel {
   private panel: HTMLDivElement;
   private open = false;
   private counts = { colors: 1, faces: 1 };
+  private equip: Record<'weapon' | 'hat', string[]> = { weapon: [], hat: [] };
   private unsub: () => void;
 
   private readonly onDocPointerDown = (e: PointerEvent) => {
@@ -50,17 +56,17 @@ export class CustomizePanel {
     this.panel.className = 'panel';
     this.panel.style.cssText =
       'position:fixed;top:104px;right:64px;display:none;pointer-events:auto;' +
-      'padding:12px 14px;border-radius:12px;max-height:70vh;overflow-y:auto;width:280px;';
+      'padding:12px 14px;border-radius:12px;max-height:74vh;overflow-y:auto;width:290px;';
 
     this.root.append(this.panel, this.button);
     document.body.appendChild(this.root);
     document.addEventListener('pointerdown', this.onDocPointerDown, true);
     this.unsub = demoStore.subscribe(() => { if (this.open) this.render(); });
 
-    void this.loadCounts();
+    void this.loadData();
   }
 
-  private async loadCounts() {
+  private async loadData() {
     try {
       const idx: CosmeticsIndex = await (await fetch('assets/cosmetics/index.json')).json();
       const c = idx[this.opts.control.characterId];
@@ -68,11 +74,16 @@ export class CustomizePanel {
     } catch {
       /* keep defaults */
     }
+    this.equip = await getHeroEquipment(this.opts.control.characterId);
     if (this.open) this.render();
   }
 
+  private commit(patch: Partial<Appearance>) {
+    this.opts.control.commit({ ...this.opts.control.get(), ...patch } as Appearance);
+    this.render();
+  }
+
   private render() {
-    const hero = this.opts.control.characterId;
     const cur = this.opts.control.get();
     this.panel.replaceChildren();
 
@@ -86,8 +97,10 @@ export class CustomizePanel {
     random.addEventListener('click', () => this.randomOwned());
     this.panel.appendChild(random);
 
-    this.panel.appendChild(this.grid('สี', this.counts.colors, 'color', cur.color));
-    this.panel.appendChild(this.grid('หน้า', this.counts.faces, 'face', cur.face));
+    this.panel.appendChild(this.imageGrid('สี', this.counts.colors, 'color', cur.color));
+    this.panel.appendChild(this.imageGrid('หน้า', this.counts.faces, 'face', cur.face));
+    this.panel.appendChild(this.equipGrid('อาวุธ', 'weapon', cur.weapon ?? null));
+    this.panel.appendChild(this.equipGrid('หมวก', 'hat', cur.hat ?? null));
 
     const hint = document.createElement('div');
     hint.textContent = '🔒 = ต้องซื้อในร้านค้า';
@@ -95,42 +108,98 @@ export class CustomizePanel {
     this.panel.appendChild(hint);
   }
 
-  private grid(title: string, count: number, type: CosmeticType, selected: number): HTMLDivElement {
+  // -- color / face: image swatches, all shown, locked ones open the store --
+
+  private imageGrid(title: string, count: number, type: CosmeticType, selected: number): HTMLDivElement {
     const hero = this.opts.control.characterId;
+    const wrap = this.section(title);
+    const g = wrap.querySelector('.cz-grid') as HTMLDivElement;
+    for (let n = 0; n < count; n++) {
+      const owned = demoStore.isOwned(hero, type, n);
+      const b = this.cell(n === selected);
+      b.style.borderRadius = type === 'color' ? '50%' : '9px';
+      b.style.background =
+        `${type === 'face' ? '#fff' : 'transparent'} url(assets/cosmetics/${hero}/${type}/${n}.png) center/cover no-repeat`;
+      if (!owned) this.lock(b);
+      b.addEventListener('click', () => {
+        if (owned) this.commit({ [type]: n });
+        else this.opts.onOpenStore();
+      });
+      g.appendChild(b);
+    }
+    return wrap;
+  }
+
+  // -- weapon / hat: a "none" cell + owned items only (buy more in the store) --
+
+  private equipGrid(title: string, slot: 'weapon' | 'hat', current: string | null): HTMLDivElement {
+    const hero = this.opts.control.characterId;
+    const wrap = this.section(title);
+    const g = wrap.querySelector('.cz-grid') as HTMLDivElement;
+
+    const none = this.cell(current == null);
+    none.textContent = '∅';
+    none.style.fontSize = '16px';
+    none.title = 'ไม่มี';
+    none.addEventListener('click', () => this.commit({ [slot]: null }));
+    g.appendChild(none);
+
+    const items = this.equip[slot];
+    let ownedCount = 0;
+    for (let n = 0; n < items.length; n++) {
+      if (!demoStore.isOwned(hero, slot, n)) continue;
+      ownedCount++;
+      const name = items[n];
+      const b = this.cell(current === name);
+      b.textContent = pretty(name).slice(0, 3);
+      b.title = pretty(name);
+      b.style.fontSize = '10px';
+      b.addEventListener('click', () => this.commit({ [slot]: name }));
+      g.appendChild(b);
+    }
+    if (ownedCount === 0) {
+      const buy = document.createElement('button');
+      buy.textContent = '🛒 ซื้อในร้าน';
+      buy.style.cssText =
+        'font-size:11px;padding:0 8px;height:40px;border-radius:9px;cursor:pointer;' +
+        'border:1px dashed var(--panel-line,#ECD9C2);background:transparent;color:#9a8574;';
+      buy.addEventListener('click', () => this.opts.onOpenStore());
+      g.appendChild(buy);
+    }
+    return wrap;
+  }
+
+  // ------------------------------------------------------------- primitives
+
+  private section(title: string): HTMLDivElement {
     const wrap = document.createElement('div');
     const h = document.createElement('div');
     h.textContent = title;
     h.style.cssText = 'font-size:11px;color:#c9a45c;margin:8px 0 5px;';
     const g = document.createElement('div');
+    g.className = 'cz-grid';
     g.style.cssText = `display:grid;grid-template-columns:repeat(6,${SWATCH}px);gap:6px;`;
-    for (let n = 0; n < count; n++) {
-      const owned = demoStore.isOwned(hero, type, n);
-      const on = n === selected;
-      const b = document.createElement('button');
-      b.title = owned ? `${type} ${n}` : 'ล็อก — ซื้อในร้านค้า';
-      b.style.cssText =
-        `position:relative;width:${SWATCH}px;height:${SWATCH}px;padding:0;cursor:pointer;` +
-        `border-radius:${type === 'color' ? '50%' : '9px'};` +
-        `border:${on ? '2.5px solid #ffd98a' : '1px solid rgba(201,164,92,0.4)'};` +
-        `background:${type === 'face' ? '#fff' : 'transparent'} ` +
-        `url(assets/cosmetics/${hero}/${type}/${n}.png) center/cover no-repeat;` +
-        (owned ? '' : 'filter:grayscale(0.7) brightness(0.6);');
-      if (!owned) {
-        const lock = document.createElement('span');
-        lock.textContent = '🔒';
-        lock.style.cssText =
-          'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;';
-        b.appendChild(lock);
-      }
-      b.addEventListener('click', () => {
-        if (owned) this.opts.control.commit({ ...this.opts.control.get(), [type]: n });
-        else this.opts.onOpenStore();
-        this.render();
-      });
-      g.appendChild(b);
-    }
     wrap.append(h, g);
     return wrap;
+  }
+
+  private cell(on: boolean): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.style.cssText =
+      `position:relative;width:${SWATCH}px;height:${SWATCH}px;padding:0;cursor:pointer;` +
+      `border-radius:9px;color:#4a3b2e;font-family:inherit;` +
+      `border:${on ? '2.5px solid #ffd98a' : '1px solid rgba(201,164,92,0.4)'};` +
+      'background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;';
+    return b;
+  }
+
+  private lock(b: HTMLButtonElement) {
+    b.style.filter = 'grayscale(0.7) brightness(0.6)';
+    const lock = document.createElement('span');
+    lock.textContent = '🔒';
+    lock.style.cssText =
+      'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;';
+    b.appendChild(lock);
   }
 
   private randomOwned() {
@@ -140,9 +209,7 @@ export class CustomizePanel {
     const colors = ownedOf('color', this.counts.colors);
     const faces = ownedOf('face', this.counts.faces);
     const pick = (arr: number[]) => arr[Math.floor(Math.random() * arr.length)] ?? 0;
-    const a: Appearance = { color: pick(colors), face: pick(faces) };
-    this.opts.control.commit(a);
-    this.render();
+    this.commit({ color: pick(colors), face: pick(faces) });
   }
 
   private show() {
