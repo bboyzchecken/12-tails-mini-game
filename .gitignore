@@ -7,3 +7,8 @@ dist/
 .claude/
 __pycache__/
 *.pyc
+
+# Next.js (/web) build output
+web/.next/
+web/out/
+*.tsbuildinfo

@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: theme('colors.cream');
+  color: theme('colors.ink');
+  font-family: theme('fontFamily.body');
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid theme('colors.accent');
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+@layer components {
+  /* ── Landing primitives (pill buttons, matching the approved mockup) ── */
+  .btn-pill {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-full px-[22px] py-3 font-head text-base transition;
+    @apply hover:brightness-105;
+  }
+  .btn-pill-primary {
+    @apply btn-pill bg-accent text-white shadow-[0_6px_16px_rgba(31,180,207,0.28)];
+  }
+  .btn-pill-ghost {
+    @apply btn-pill border-[1.5px] border-accent-soft bg-white text-accent-ink;
+  }
+
+  /* ── Admin primitives — mirror the game's .panel / .btn so the two feel alike. */
+  .panel {
+    @apply rounded-2xl border border-line bg-panel shadow-panel;
+  }
+  .btn {
+    @apply cursor-pointer rounded-xl border border-transparent px-4 py-2 font-head transition;
+  }
+  .btn-primary {
+    @apply bg-accent text-white hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-ghost {
+    @apply border-line bg-white text-ink hover:bg-line/40;
+  }
+  .field {
+    @apply rounded-lg border border-line bg-white px-3 py-2 text-ink outline-none focus:border-accent;
+  }
+}

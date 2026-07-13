@@ -37,7 +37,7 @@
 
 ### สถานะการสร้าง
 - [x] **Go API (`/api`) + PostgreSQL + `POST /track` + `POST /waitlist`** — ✅ **Phase 1 เสร็จ** (Echo+GORM+FX ตามเทมเพลต · build+vet ผ่าน · verify กับ Postgres จริง)
-- [ ] **Next.js frontend (`/web`)** (landing + admin) — ยังไม่มี
+- [x] **Next.js frontend (`/web`) — landing** ✅ **Phase 3 เสร็จ** (Next 15 + TS + Tailwind + Zustand + TanStack + Axios · พอร์ต landing จาก mockup · waitlist→`POST /waitlist` · ยิง page_view/cta_click/waitlist_signup · consent banner · verify กับ Postgres จริง + static export ผ่าน) · admin UI = Phase 4
 - [ ] **บัญชีผู้เล่น + โปรไฟล์เกม** ⭐ — register/login, `family_name` ถาวร, `Character`+slots, nameplate 2 บรรทัด, ประวัติเติมเงิน (ตอนนี้ชื่อเป็น ephemeral ไม่มีบัญชี → นับคนจริง/รู้ว่าใครเติมไม่ได้)
 - [x] **เกมยิง analytics** ⭐ — ✅ **Phase 2 เสร็จ** · `client/src/net/track.ts` (session UUID + JWT→account_id) ยิง `game_open`/`play_start`/`shop_open`/`buy_intent` → `POST /track` · `demoStore.buy()` แนบ `item_id`+`price_jil` (verify กับ Postgres จริงแล้ว)
 - [ ] **Admin dashboard** — funnel, demand ranking, would-be revenue, CSV export
@@ -198,22 +198,24 @@
 - [ ] `gacha_pull` / `battlepass_intent` / `supporter_intent` — ⏭️ ยังไม่มีพื้นผิวนั้นในเดโม (เปิดเมื่อมี gacha/battlepass UI)
 - **AC:** ✅ เดินครบ flow ในเกม → event ถูกบันทึกทุกจุด (verify กับ Postgres จริง: 4 types + account_id ตอน login), `buy_intent` มี `item_id`+`price_jil` จริง
 
-### Phase 3 — Next.js frontend + Landing  `(= L1)`
-- [ ] scaffold `/web`: Next.js ล่าสุด + TS + Tailwind + **Zustand + TanStack Query + Axios**
-- [ ] `lib/api/axios.ts` (baseURL Go API + interceptor session/JWT) · QueryClient provider · Zustand: `consent`, `session`
-- [ ] `lib/analytics/events.ts` — TS taxonomy (mirror กับ Go)
-- [ ] พอร์ต `12tails-landing-mockup.html` → components (design tokens เดิม): Hero+CTA+waitlist · "มันคืออะไร" · ฟีเจอร์ grid · 12 เผ่า (art slot) · Discord CTA · Footer *fan project*
-- [ ] waitlist form → TanStack **mutation** → `POST /waitlist` · ยิง `page_view`/`cta_click`/`waitlist_signup`
-- [ ] consent banner (Zustand) + ลิงก์ privacy · responsive มือถือ
-- **AC:** landing เปิดสวย ลงมือถือ · กรอก waitlist → มี row · เข้าเกมจากปุ่มได้ · event ถูกยิง
+### Phase 3 — Next.js frontend + Landing  `(= L1)` ✅ เสร็จแล้ว
+- [x] scaffold `/web`: Next 15 (App Router) + TS + Tailwind + **Zustand + TanStack Query + Axios** · `output:'export'` (static → CF Pages) · แยกจาก npm workspaces เกม
+- [x] `lib/api/axios.ts` (baseURL Go API + interceptor: `X-Session-Id` + admin JWT) · QueryClient provider (`app/providers.tsx`) · Zustand: `consent` (persist, opt-out), `session` · `lib/identity.ts` แชร์ session/token key กับเกม
+- [x] `lib/analytics/events.ts` — TS taxonomy (mirror `client/src/net/track.ts` + Go) · transport = keepalive fetch (ไม่ใช้ sendBeacon — beacon application/json ถูก Chromium บล็อก)
+- [x] พอร์ต `12tails-landing-mockup.html` → components (design tokens ใน `tailwind.config.ts`): Nav · Hero+CTA+waitlist · ฟีเจอร์ grid · 12 เผ่า (ข้อมูลจริงจาก characters-seed, wolf+sheep = ready) · Discord/community CTA · Footer *fan project* · หน้า `/privacy` · self-host fonts (next/font, ไม่ยิง Google Fonts = ไม่รั่ว IP)
+- [x] waitlist form → TanStack **mutation** → `POST /waitlist` · ยิง `page_view`/`cta_click`/`waitlist_signup`
+- [x] consent banner (Zustand) + ลิงก์ privacy · responsive มือถือ (375px: ไม่มี horizontal overflow, nav ย่อ, grid reflow)
+- **AC:** ✅ landing เปิดสวย ลงมือถือ · กรอก waitlist → มี row (verify Postgres จริง) · เข้าเกมจากปุ่มได้ (nav CTA → :8080) · event ถูกยิง (page_view/waitlist_signup/cta_click เข้า Postgres) · `next build` static export ผ่าน
+- ⚠️ ต้องเพิ่ม `http://localhost:3000` ใน `CLIENT_ORIGIN` (Go CORS) — ทำแล้วใน `.env`/`.env.example`
 
-### Phase 4 — Admin dashboard ⭐  `(= L3–L4)` 🟡 Go backend เสร็จ · Web ต่อ
+### Phase 4 — Admin dashboard ⭐  `(= L3–L4)` ✅ เสร็จแล้ว (Go + Web)
 - [x] **Go:** admin auth ✅ — seed admin จาก env (`ADMIN_EMAIL`/`ADMIN_PASSWORD`, `seedAdmin` ตอน startup, ไม่เปิด public admin register) · `POST /auth/login` → JWT · `/admin/*` = `JwtMiddleware`+`IsAdmin` (verify: no token→401, non-admin→403)
 - [x] **Go:** `/admin/metrics` ✅ (aggregate SQL, `?from`/`?to` filter): cards (unique_sessions · active_accounts/MAU · registered_users · waitlist · buy_intents · would_be_revenue) · **funnel** (distinct sessions/stage: game_open→play_start→shop_open→buy_intent) · **demand ranking** (group by `item_id` + Σ price จาก jsonb) · time series (รายวัน) · referrers · **ประวัติเติมเงิน(demo) ต่อบัญชี** (join users) · nil→[] coercion
 - [x] **Go:** `/admin/events/export` → CSV ✅ (`Content-Disposition: attachment`, ทุกคอลัมน์ + meta jsonb, `?from`/`?to`/`?limit`)
-- [ ] **Web:** `/admin` (protected) + หน้า login · date filter (Zustand) · ดึงผ่าน **TanStack Query** — ต้อง scaffold `/web` (Phase 3) ก่อน
-- [ ] **Web:** charts — top-line cards · funnel % · **★ bar chart "ชุดที่คนอยากซื้อสุด"** · would-be revenue (ระบุ *"ประมาณการจากความสนใจ ไม่ใช่ยอดขาย"*) · time series · ปุ่ม export CSV
-- **AC (Go ✅ verify แล้ว):** demand ranking + funnel + would-be revenue + CSV ทำงานจริงกับ Postgres · **เหลือ Web:** กราฟ "ชุดที่คนอยากซื้อสุด" + funnel % + ปุ่ม export
+- [x] **Web:** `/admin` (protected, client-side gate + hydration guard) + หน้า `/admin/login` ✅ · date filter (Zustand) · ดึงผ่าน **TanStack Query** (Axios instance + JWT interceptor)
+- [x] **Web:** charts (**Recharts**) ✅ — top-line cards 6 ใบ · funnel % · **★ bar chart "ชุดที่คนอยากซื้อสุด"** · would-be revenue (ระบุ *"ความสนใจ/ประมาณการ ไม่ใช่ยอดขาย"*) · time series (area) · ตาราง topups/referrers · ปุ่ม **Export CSV** (blob + auth header)
+- **AC ✅ verify แล้ว (end-to-end):** login admin → dashboard โหลด metrics จริงจาก Go API · กราฟ "ชุดที่คนอยากซื้อสุด" ขึ้น bar · funnel % ถูก · Export CSV ได้ (200 text/csv) · authz 401/403 · `next build` static export ผ่าน (landing SSG + admin SPA)
+- 🔜 deploy จริง (CF Pages + AWS API) = Phase 6 · ตอนรัน: restart Go API ด้วยโค้ด Phase 4 + ตั้ง `ADMIN_EMAIL`/`ADMIN_PASSWORD` (seed admin) + `web` `NEXT_PUBLIC_API_URL` ชี้ API
 
 ### Phase 5 — Season scheduling  `(= S0–S4)`
 - [ ] **Go:** domain **Collection** + **CosmeticItem** (+ seed "ชุดฤดูร้อน") + `utils/liveness` (`isLiveNow`/`statusLabel` — **computed on read, ไม่มี cron**)
