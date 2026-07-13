@@ -35,10 +35,9 @@
 | **ดีไซน์ตกปลา** | `ระบบตกปลา-12หาง.md` (+prompt-pack, context-brief) — spec ครบ, **ยังไม่มีโค้ด** |
 | **เทมเพลตหลังบ้าน** | Go REST API template ที่ทีมถนัด (layered + repository + FX) — ใช้เป็นพิมพ์เขียว |
 
-### 🔴 ยังไม่มี (ต้องสร้างใหม่ทั้งหมด)
-- [ ] **Go API project** (`12tails-api`) — ยังไม่มี
-- [ ] **PostgreSQL + models + `/track`** — ยังไม่มีการเก็บ event ใด ๆ
-- [ ] **Next.js frontend** (landing + admin) — ยังไม่มี
+### สถานะการสร้าง
+- [x] **Go API (`/api`) + PostgreSQL + `POST /track` + `POST /waitlist`** — ✅ **Phase 1 เสร็จ** (Echo+GORM+FX ตามเทมเพลต · build+vet ผ่าน · verify กับ Postgres จริง)
+- [ ] **Next.js frontend (`/web`)** (landing + admin) — ยังไม่มี
 - [ ] **บัญชีผู้เล่น + โปรไฟล์เกม** ⭐ — register/login, `family_name` ถาวร, `Character`+slots, nameplate 2 บรรทัด, ประวัติเติมเงิน (ตอนนี้ชื่อเป็น ephemeral ไม่มีบัญชี → นับคนจริง/รู้ว่าใครเติมไม่ได้)
 - [ ] **เกมยิง analytics** ⭐ — `demoStore.buy()` แค่แก้ localStorage **ไม่ส่ง `buy_intent` ไปที่ไหน** (จุดเชื่อมที่ขาดและสำคัญสุด)
 - [ ] **Admin dashboard** — funnel, demand ranking, would-be revenue, CSV export
@@ -101,40 +100,42 @@
 
 ---
 
-## 4. โครงสร้างโปรเจกต์ที่แนะนำ
+## 4. โครงสร้างโปรเจกต์ (monorepo — repo เดียวกับเกม)
 
-แยกเป็น **3 โปรเจกต์** (Go เป็น module ของตัวเองตามเทมเพลต ไม่ปนกับ npm workspace):
+**ทุกอย่างอยู่ใน `12-tails-mini-game/` repo เดียว** เพื่อจัดการที่เดียว (npm workspaces ระบุ package เป็นชื่อชัดๆ ไม่ใช่ glob → โฟลเดอร์ `api/` (Go) กับ `web/` (Next.js) จึงไม่ถูก npm/TS แตะ · Go module มี `go.mod` ของตัวเอง แยกอิสระ). โตขึ้นค่อย `git subtree split` แยกออกทีหลังได้ (ประวัติติดไปด้วย)
 
 ```
-12-tails-mini-game/     (เกม monorepo เดิม — ไม่แตะโครง)
-  /client  /server  /shared
+12-tails-mini-game/
+  /client  /server  /shared           (เกม — Phaser · Socket.IO relay · TS contracts, เดิม)
 
-12tails-api/            ★ ใหม่ — Go module (คัดลอกโครงจาก PROJECT_TEMPLATE.md)
-  main.go  seeder.go  docker-compose.yml (postgres)  Dockerfile  k8s/  migrations/
-  pkg/
-    core/config.go                     # + PostgresConfig
-    handlers/api/
-      api.go  middleware.go            # JWT + IsAdmin (จากเทมเพลต)
-      track.handler.go  waitlist.handler.go
-      store.handler.go                 # GET /store/active (public)
-      admin.handler.go                 # metrics / demand ranking / CSV / collections
-    models/   event.go  waitlist.go  collection.go  cosmetic_item.go  user.go
-    store/    event/  waitlist/  collection/  cosmetic_item/  user/
-    services/  (ตัด R2/Gmail ออกก่อน)
-    utils/    liveness/  (isLiveNow / statusLabel — computed on read)
+  /api/                 ★ Go module (github.com/mac-checken/12tails-api) — ตาม PROJECT_TEMPLATE.md
+    main.go  docker-compose.yml (postgres)  Dockerfile  .env(.example)
+    pkg/
+      core/config.go                   # Config + PostgresConfig + DSN()  ✅ Phase 1
+      db/db.go                         # GORM postgres + gormigrate       ✅ Phase 1
+      logger/                          # Logrus + request logging          ✅ Phase 1
+      handlers/api/
+        api.go                         # Server, CORS, routes              ✅ Phase 1
+        track.handler.go  waitlist.handler.go                              ✅ Phase 1
+        middleware.go                  # JWT + IsAdmin (Phase P/4)
+        store.handler.go               # GET /store/active (Phase 5)
+        admin.handler.go               # metrics / demand ranking / CSV (Phase 4)
+        fishing.handler.go             # /fishing/cast ฯลฯ (F-track)
+      models/  event.go waitlist.go (✅) · user.go character.go collection.go … (ถัดไป)
+      store/   event/ waitlist/ (✅) · user/ character/ collection/ … (ถัดไป)
+      utils/liveness/                  # isLiveNow / statusLabel (Phase 5)
 
-12tails-web/            ★ ใหม่ — Next.js (ล่าสุด) frontend
-  app/
-    (marketing)/…       landing สาธารณะ (พอร์ตจาก mockup)
-    admin/…             dashboard (protected ด้วย JWT)
-  lib/
-    api/axios.ts        # instance: baseURL Go API + interceptor (session_id/JWT)
-    api/queries.ts      # TanStack Query hooks
-    analytics/events.ts # ★ taxonomy (แหล่งเดียวฝั่ง web — ห้าม inline)
-    store/*.ts          # Zustand: consent, session, filters
+  /web/                 ★ Next.js (ล่าสุด) frontend — deploy → Cloudflare Pages
+    app/(marketing)/…   landing สาธารณะ (พอร์ตจาก mockup)
+    app/admin/…         dashboard (protected ด้วย JWT)
+    lib/api/axios.ts    # instance: baseURL Go API + interceptor (session_id/JWT)
+    lib/api/queries.ts  # TanStack Query hooks
+    lib/analytics/events.ts   # ★ taxonomy (แหล่งเดียวฝั่ง web — ห้าม inline)
+    lib/store/*.ts      # Zustand: consent, session, filters
 ```
 
-> 💡 จะทำ `12tails-api` / `12tails-web` เป็น repo แยกก็ได้ (ตรงสไตล์ larkornsan-api) หรือวางเป็นโฟลเดอร์พี่น้องก็ได้ — ขอแค่ **Go module แยกจาก npm workspace** กัน tooling ชนกัน
+> ✅ **Phase 1 สร้างแล้ว** ที่ `/api` (Echo+GORM+FX+Postgres · `/health`, `POST /track`, `POST /waitlist` · build+vet ผ่าน · verify กับ Postgres จริงแล้ว)
+> 💡 dev ports เครื่องนี้: API `:5055` (AirPlay จอง 5000), Postgres host `:5433` (โปรเจกต์อื่นจอง 5432) — ดู `api/.env`
 
 ---
 
@@ -159,14 +160,15 @@
 
 > 🧭 ทุกเฟสฝั่ง Go ทำตามขั้นตอน **"Adding a New Domain"** ของเทมเพลต: Model → Store → Handler → Register (FX + api.Server) → Route → Migration
 
-### Phase 1 — Go API backbone + ingestion  `(= L0)`
-- [ ] scaffold `12tails-api` จากเทมเพลต (Echo+GORM+FX+Viper+Logrus+validator+gormigrate) — **สลับเป็น Postgres**
-- [ ] `docker-compose.yml` postgres:16 + `core/config.go` `PostgresConfig` + DSN
-- [ ] domain **Event** — model `Event{ SessionID, Type, ItemID*, Meta(JSONB), Referrer*, CreatedAt }` + store (Create + aggregate methods ไว้ทำ dashboard) + `POST /track`
-- [ ] domain **Waitlist** — model `Waitlist{ Email(unique), Source*, CreatedAt }` + `POST /waitlist`
-- [ ] CORS ให้ origin ของเกม + landing · รับ `session_id` (client-generated UUID)
-- [ ] gormigrate: AutoMigrate `Event`, `Waitlist`
-- **AC:** `curl POST /track` → มี row ใน Postgres, field ครบ · `/waitlist` กันอีเมลซ้ำ
+### Phase 1 — Go API backbone + ingestion  `(= L0)` ✅ เสร็จแล้ว
+- [x] scaffold `/api` จากเทมเพลต (Echo+GORM+FX+Viper+Logrus+validator+gormigrate) — **สลับเป็น Postgres**
+- [x] `docker-compose.yml` postgres:16-alpine + `core/config.go` `PostgresConfig` + `DSN()`
+- [x] domain **Event** — `Event{ SessionID, AccountID*, Type, ItemID*, Meta(JSONB), Referrer*, CreatedAt }` + store + `POST /track` (session_id: body→header→gen · meta jsonb · index `(type,created_at)`)
+- [x] domain **Waitlist** — `Waitlist{ Email(unique), Source*, CreatedAt }` + `POST /waitlist` (dedupe + lowercase)
+- [x] CORS ให้ origin ของเกม + landing · รับ `session_id` (client-generated UUID)
+- [x] gormigrate: AutoMigrate `Event`, `Waitlist`
+- **AC:** ✅ `curl POST /track` → row ใน Postgres, field ครบ · buy_intent ดึง price/type จาก jsonb ได้ · `/waitlist` กันซ้ำ
+- 🔜 ต่อยอด: aggregate methods ใน EventStore (ไว้ทำ dashboard Phase 4)
 
 ### Phase P — บัญชีผู้เล่น + โปรไฟล์เกม  `(ใหม่ · ทำหลัง Phase 1, ก่อนฟีเจอร์ persistent)`
 > เดิม Phase 3 = landing/frontend เท่านั้น **ไม่รวม**บัญชีผู้เล่น — นี่คือส่วนที่เพิ่ม
@@ -192,7 +194,7 @@
 - **AC:** เดินครบ flow ในเกม → event ถูกบันทึกทุกจุด, `buy_intent` มี `item_id`+`price_jil` จริง
 
 ### Phase 3 — Next.js frontend + Landing  `(= L1)`
-- [ ] scaffold `12tails-web`: Next.js ล่าสุด + TS + Tailwind + **Zustand + TanStack Query + Axios**
+- [ ] scaffold `/web`: Next.js ล่าสุด + TS + Tailwind + **Zustand + TanStack Query + Axios**
 - [ ] `lib/api/axios.ts` (baseURL Go API + interceptor session/JWT) · QueryClient provider · Zustand: `consent`, `session`
 - [ ] `lib/analytics/events.ts` — TS taxonomy (mirror กับ Go)
 - [ ] พอร์ต `12tails-landing-mockup.html` → components (design tokens เดิม): Hero+CTA+waitlist · "มันคืออะไร" · ฟีเจอร์ grid · 12 เผ่า (art slot) · Discord CTA · Footer *fan project*
@@ -278,7 +280,7 @@
 | **Legal / art positioning** ⚠️ | art placeholder/ออริจินอล + ป้าย *fan project* | landing สาธารณะ + IP ของ Bigbug — **ควรขอ soft-approval ก่อนโปรโมทวงกว้าง** (กัน takedown + pitch แข็งขึ้น) |
 | Backend | Go template + **PostgreSQL** | ✅ ยืนยันแล้ว |
 | Frontend | Next.js ล่าสุด + Zustand + TanStack Query + Axios | ✅ ยืนยันแล้ว |
-| แยก repo หรือโฟลเดอร์ | Go module + Next.js แยกจาก npm workspace | กัน tooling ชนกัน |
+| โครงสร้าง repo (✅ เคาะแล้ว) | **monorepo เดียวกับเกม** — `/api` (Go) + `/web` (Next.js) | จัดการที่เดียว · โตค่อย `git subtree split` แยก |
 | **สกุลเงินตกปลา** | "เกล็ด" (Scales) แยกจาก Jil เด็ดขาด | เกล็ดซื้อได้แค่ของสายตกปลา · ตกปลาห้ามผลิต Jil (กันกินรายได้ตัวเอง) |
 | **ผลตกปลา** | Server-authoritative (server สุ่ม, client เล่นอนิเมชัน) | กันปั๊ม/เสกไอเทมที่มีมูลค่า |
 | **ปลดคันเบ็ด (ยังไม่สรุป)** | ครั้งเดียวจบ **vs** daily-gate | spec §7 ค้างไว้ — daily-gate แรงกว่าแต่กดดันกว่า |
@@ -308,10 +310,10 @@
 ## 10. Addendum สำหรับ CLAUDE.md (เพิ่มเมื่อเริ่มทำ web)
 
 ```md
-## Web stack rules (12tails-web + 12tails-api)
+## Web stack rules (/web + /api — monorepo เดียวกับเกม)
 - Backend = Go (Echo+GORM+Uber FX+JWT) ตาม PROJECT_TEMPLATE.md + PostgreSQL. เพิ่ม domain: Model → Store → Handler → Register(FX/api.Server) → Route → Migration.
 - Frontend = Next.js (App Router) + Zustand (client state) + TanStack Query (server data) + Axios (1 instance). ห้ามใช้ fetch ตรง/ห้ามยัด server data ลง Zustand.
-- Analytics event taxonomy: TS อยู่ที่ 12tails-web/lib/analytics/events.ts, Go models mirror. JSON snake_case. ห้าม inline event shape.
+- Analytics event taxonomy: TS อยู่ที่ web/lib/analytics/events.ts, Go models (api/pkg/models) mirror. JSON snake_case. ห้าม inline event shape.
 - buy_intent = interest signal, NOT a sale. Dashboard copy = "ความสนใจ/ประมาณการ", never "ยอดขาย".
 - /admin + /admin/* protected ด้วย JWT+IsAdmin. session_id เป็น anonymous UUID. เคารพ consent banner. ไม่เก็บ PII เกิน waitlist email.
 - "On sale now" COMPUTED on read (utils/liveness ใน Go). ไม่มี cron/ไม่ persist live flag. GET /store/active = แหล่งเดียวของของที่ขายอยู่.
