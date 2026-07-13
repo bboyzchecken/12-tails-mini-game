@@ -105,7 +105,7 @@ const LAYOUT = `
     </div>
     <form class="auth-form">
       <input class="auth-email" type="email" autocomplete="email" placeholder="อีเมล" />
-      <input class="auth-family" type="text" maxlength="${CONFIG.NAME_MAX_LEN}" placeholder="ชื่อ family เช่น CHXQ (ถาวร)" />
+      <input class="auth-family" type="text" maxlength="${CONFIG.NAME_MAX_LEN}" placeholder="ชื่อ family (ตั้งครั้งเดียว ถาวร)" />
       <input class="auth-pass" type="password" autocomplete="current-password" placeholder="รหัสผ่าน" />
       <div class="auth-err" role="alert"></div>
       <button class="btn btn-primary auth-submit" type="submit">เข้าสู่ระบบ</button>

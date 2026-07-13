@@ -186,7 +186,7 @@
 - [ ] **game-side (client):** หน้าจอ register/login ก่อนเข้าเกม · `CharacterSelect` → **character-slot picker** (เลือก/สร้างในช่องว่าง/สลับตัว) · เก็บ JWT แนบทุก request ที่ต้อง persist
 - [ ] ชื่อ **ถาวร** — เปลี่ยนได้เฉพาะผ่านไอเทม Jil (`name_change`) · slot เพิ่มด้วย Jil (`char_slot`) → ยิง `buy_intent`
 - [ ] **guest gate (แนะนำ):** guest เดิน/คุยได้ด้วยชื่อชั่วคราว (นับเป็น session) · บังคับ register เมื่อจะจองชื่อถาวร/เก็บตัวละคร/เติมเงิน/เก็บ inventory ตกปลา — รักษา funnel "เข้ามาลองก่อน"
-- **AC (backend ✅ verify แล้ว):** สมัคร→ได้ family_name ถาวร + สร้าง character (slot 0-2, ตัวที่ 4 = 409) · dup family = 409 · password เก็บเป็น bcrypt · JWT กัน `/me/*` · topup history รวมยอดถูก · nameplate = family/name (CHXQ / หมาป่าเดียวดาย)
+- **AC (backend ✅ verify แล้ว):** สมัคร→ได้ family_name ถาวร + สร้าง character (slot 0-2, ตัวที่ 4 = 409) · dup family = 409 · password เก็บเป็น bcrypt · JWT กัน `/me/*` · topup history รวมยอดถูก · nameplate = family/name (ชื่อ family / ชื่อตัวละคร)
 - 🔜 **เหลือ game-side:** register/login UI ก่อนเข้าเกม · `CharacterSelect` → character-slot picker · nameplate 2 บรรทัด (`Overhead.ts`/`ChatBubble`) + `player:join` payload · แนบ JWT + `account_id` ในทุก event (คู่กับ Phase 2)
 
 ### Phase 2 — เชื่อมเกม → API ⭐  `(= L2 ส่วนเกม)`

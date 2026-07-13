@@ -56,7 +56,7 @@ cd api && go run .            # อ่าน ../.env, migrate อัตโนม
 ```bash
 # สมัคร → ได้ token
 curl -s -X POST localhost:5055/auth/register -H 'Content-Type: application/json' \
-  -d '{"email":"wolf@example.com","password":"secret1","family_name":"CHXQ"}'
+  -d '{"email":"wolf@example.com","password":"secret1","family_name":"STARLIGHT"}'
 # สร้างตัวละคร (ชื่อถาวร) — แนบ Bearer token
 curl -s -X POST localhost:5055/me/characters -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \

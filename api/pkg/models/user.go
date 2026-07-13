@@ -10,7 +10,7 @@ type User struct {
 	Email        string    `gorm:"uniqueIndex;not null" json:"email"`
 	Username     *string   `gorm:"uniqueIndex" json:"username,omitempty"`
 	PasswordHash string    `gorm:"not null" json:"-"`
-	FamilyName   string    `gorm:"uniqueIndex;not null" json:"family_name"` // permanent, e.g. "CHXQ"
+	FamilyName   string    `gorm:"uniqueIndex;not null" json:"family_name"` // permanent family/guild tag
 	Role         string    `gorm:"default:user" json:"role"`                // user | admin
 	Status       string    `gorm:"default:active" json:"status"`            // active | deactivated
 	CreatedAt    time.Time `json:"created_at"`
