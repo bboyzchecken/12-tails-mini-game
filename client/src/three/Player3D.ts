@@ -3,6 +3,7 @@ import { CONFIG } from '@12tails/shared/config';
 import type { Direction, PlayerState } from '@12tails/shared/events';
 import { instantiateCharacter, type CharacterAsset, type CharacterInstance } from './CharacterAsset';
 import { mountPatterns, type EquipSlot } from './EquipmentLoader';
+import { applyOutfit, type OutfitBinding } from './CostumeLoader';
 
 /**
  * Wolf is the reference rig — its weapons/hats are authored to sit correctly.
@@ -28,6 +29,24 @@ const HEAD_MARGIN = 0.25;
 const ANIM_FADE = 0.18;
 const TURN_SPEED = 12; // rad/s toward target yaw
 
+/**
+ * HAT PLACEMENT. The equipment items were exported from Unity STANDALONE (static
+ * meshes) while the character rig was exported as a SKINNED mesh — UnityGLTF puts
+ * the two through different coordinate conversions, so a hat's baked rotation
+ * does NOT compose onto the head mount bone (it lands floating up-and-behind, the
+ * long-standing bug). Reverse-engineering the exact frame bridge failed (the
+ * skinned conversion isn't a clean basis change), so we place hats geometrically:
+ * every hat mesh is authored with its long axis = local +Z, so we stand it
+ * world-upright (mesh +Z → world +Y) and auto-seat its bounding-box bottom at the
+ * head-top. Per-hat size and per-hero head shape both cancel out — no tuning.
+ * Verified in the dev harness (client/public/dev-hat-test.html) across crown /
+ * helmet / frozenCrown on chameleon.
+ */
+const HAT_SPIN = 0; // yaw about world-up; hats share one authored frame
+const HAT_SEAT_FUDGE = -0.15; // seat the ring slightly into the hair
+const X_AXIS = new THREE.Vector3(1, 0, 0);
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+
 /** Actions that end in a held pose; everything else loops until the player moves. */
 const HOLD_END_ACTIONS = new Set(['sit', 'sleep', 'pose']);
 
@@ -48,6 +67,13 @@ abstract class PlayerBase {
   protected clips: THREE.AnimationClip[];
   private materials: THREE.MeshStandardMaterial[];
   private equipped = new Map<EquipSlot, THREE.Object3D>();
+  /** The base ("nude") body skinned mesh(es) from the character glb — the
+   *  costume graft swaps geometry onto the first and hides any extras. */
+  private bodyMeshes: THREE.SkinnedMesh[] = [];
+  /** Active outfit graft (null = bare base body); `restore()` undoes it. */
+  private outfitBinding: OutfitBinding | null = null;
+  /** Currently-worn costume id, so a redundant re-apply is skipped. */
+  private outfitId: string | null = null;
   /** Playing emote action (sit/dance/...); held until the player moves. */
   protected emoteAction: THREE.AnimationAction | null = null;
   /** Position in server pixel space. */
@@ -67,6 +93,11 @@ abstract class PlayerBase {
     this.walk = inst.walk;
     this.clips = inst.clips;
     this.materials = inst.materials;
+    // The skinned body mesh(es); equipment (weapons/hats) are static meshes on
+    // bones, so anything skinned here is body — safe to grab now, before equip.
+    this.group.traverse((o) => {
+      if ((o as THREE.SkinnedMesh).isSkinnedMesh) this.bodyMeshes.push(o as THREE.SkinnedMesh);
+    });
     this.posPx.set(x, y);
     this.syncTransform(1);
     this.setAnim(false, true);
@@ -115,9 +146,49 @@ abstract class PlayerBase {
     this.emoteAction = action;
   }
 
-  /** Swap the body texture (color + face composite) from CharacterAsset. */
+  /** Swap the *base body* texture (color + face composite from CharacterAsset).
+   *  While a costume is worn the base body is hidden, but its material still
+   *  gets the texture so it's correct the moment the costume comes off. */
   setBodyTexture(tex: THREE.Texture) {
     for (const m of this.materials) {
+      m.map = tex;
+      m.needsUpdate = true;
+    }
+  }
+
+  /**
+   * Wear a costume body (or clear it, restoring the nude base). `costume` is a
+   * fresh SkinnedMesh from CostumeLoader; we graft it onto the base body mesh
+   * so it deforms with the shared rig — the same whole-body swap the game does.
+   * `id` lets a redundant re-apply of the same costume be skipped.
+   */
+  setOutfit(costume: THREE.SkinnedMesh | null, id: string | null = null) {
+    if (this.outfitBinding && this.outfitId === id && costume) return; // already on
+    // Drop any current graft first (back to the nude base body).
+    if (this.outfitBinding) {
+      this.outfitBinding.restore();
+      this.outfitBinding = null;
+      this.outfitId = null;
+    }
+    for (const m of this.bodyMeshes) m.visible = true;
+    if (!costume) return;
+
+    const base = this.bodyMeshes[0];
+    if (!base) return;
+    const binding = applyOutfit(base, costume);
+    if (!binding) return; // graft failed — stay nude (logged in applyOutfit)
+    // Multi-mesh rigs (rare): the costume is one full body, so hide extra base
+    // meshes while it's worn.
+    for (let i = 1; i < this.bodyMeshes.length; i++) this.bodyMeshes[i].visible = false;
+    this.outfitBinding = binding;
+    this.outfitId = id;
+  }
+
+  /** Overlay the player's chosen face onto the worn costume's atlas. No-op when
+   *  no costume is on (the base body carries the face via setBodyTexture). */
+  setOutfitTexture(tex: THREE.Texture) {
+    if (!this.outfitBinding) return;
+    for (const m of this.outfitBinding.materials) {
       m.map = tex;
       m.needsUpdate = true;
     }
@@ -142,15 +213,58 @@ abstract class PlayerBase {
       console.warn(`[player] mount bone for '${slot}' not found on this rig`);
       return;
     }
-    // Normalize this rig's mount-bone orientation to wolf's so the item's baked
-    // pose lands the same way on every character. `mirror` flips the off-hand
-    // copy (scale −Y) so a dual-wielder's reused main-hand mesh sits
-    // symmetrically on the mirrored left bone instead of pointing the wrong way.
+    if (slot === 'hat') {
+      this.seatHat(obj, bone);
+      this.equipped.set(slot, obj);
+      return;
+    }
+    // Weapons: normalize this rig's mount-bone orientation to wolf's so the item's
+    // baked pose lands the same way on every character. `mirror` flips the off-hand
+    // copy (scale −Y) so a dual-wielder's reused main-hand mesh sits symmetrically
+    // on the mirrored left bone instead of pointing the wrong way.
     obj.position.set(0, 0, 0);
     obj.quaternion.copy(this.boneCorrection(bone, slot));
     obj.scale.set(1, mirror ? -1 : 1, 1);
     bone.add(obj);
     this.equipped.set(slot, obj);
+  }
+
+  /**
+   * Seat a hat on the head. See the HAT PLACEMENT note above: stand the mesh
+   * world-upright (its long axis is local +Z → world +Y) and drop it so its
+   * bounding-box bottom rests at the head-top. The hat rides the head through
+   * animation because it's parented to the mount bone.
+   */
+  private seatHat(obj: THREE.Object3D, bone: THREE.Object3D) {
+    // Strip the baked (mis-framed) rotations so the mesh sits in its raw
+    // geometry frame; our own orientation then stands it up.
+    obj.traverse((o) => o.quaternion.identity());
+    obj.scale.set(1, 1, 1);
+
+    bone.updateWorldMatrix(true, false);
+    const mountQ = bone.getWorldQuaternion(new THREE.Quaternion());
+    const mountS = bone.getWorldScale(new THREE.Vector3());
+    const upright = new THREE.Quaternion()
+      .setFromAxisAngle(Y_AXIS, HAT_SPIN)
+      .multiply(new THREE.Quaternion().setFromAxisAngle(X_AXIS, -Math.PI / 2));
+    obj.quaternion.copy(mountQ.clone().invert().multiply(upright));
+    obj.position.set(0, 0, 0);
+    bone.add(obj);
+
+    // Auto-seat: translate so the hat's world bbox bottom meets the head-top.
+    obj.updateWorldMatrix(true, true);
+    const bottom = new THREE.Box3().setFromObject(obj).min.y;
+    const target = this.bodyTopWorldY() + HAT_SEAT_FUDGE;
+    const worldDrop = new THREE.Vector3(0, target - bottom, 0);
+    obj.position.copy(worldDrop.applyQuaternion(mountQ.clone().invert()).divide(mountS));
+  }
+
+  /** World-space Y of the top of the body mesh(es) — the head-top the hat seats
+   *  onto. Uses bind-pose geometry bounds (character stands ~upright). */
+  private bodyTopWorldY(): number {
+    const box = new THREE.Box3();
+    for (const m of this.bodyMeshes) box.expandByObject(m);
+    return box.isEmpty() ? this.group.position.y + this.headUnits : box.max.y;
   }
 
   /** Rotation that makes `bone` present the item as wolf's equivalent bone does. */

@@ -8,6 +8,11 @@ export interface Appearance {
    *  or null/absent for an empty slot. */
   weapon?: string | null; // held in hand (mount_Hand_R)
   hat?: string | null;    // worn overhead (mount_OverHead)
+  /** Body-costume id — a full-body skinned mesh swapped onto the shared rig
+   *  (assets/costumes/<id>/<outfit>.glb), exactly as the game grafts costumes.
+   *  null/absent = the bare "nude" base body baked into the character glb. The
+   *  starter outfit is 'scout' (see shared/config.ts DEFAULT_OUTFIT). */
+  outfit?: string | null;
 }
 
 export interface PlayerState {

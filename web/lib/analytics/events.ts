@@ -31,7 +31,8 @@ export type EventType =
   // landing-only
   | 'page_view'
   | 'cta_click'
-  | 'waitlist_signup';
+  | 'waitlist_signup'
+  | 'feedback';
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5055').replace(/\/$/, '');
 
@@ -89,6 +90,11 @@ export function trackCtaClick(target: string, location?: string): void {
 /** A waitlist email was accepted by the API. `source` = which form/section. */
 export function trackWaitlistSignup(source: string): void {
   track('waitlist_signup', { meta: { source } });
+}
+
+/** Free-text demand signal: "which tribe / cosmetic do you want?" (spec §8). */
+export function trackFeedback(wants: string): void {
+  track('feedback', { meta: { wants: wants.slice(0, 500) } });
 }
 
 function safeReferrer(): string | undefined {

@@ -16,6 +16,7 @@ body {
   font-family: theme('fontFamily.body');
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 :focus-visible {
@@ -28,13 +29,23 @@ body {
   /* ── Landing primitives (pill buttons, matching the approved mockup) ── */
   .btn-pill {
     @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-full px-[22px] py-3 font-head text-base transition;
-    @apply hover:brightness-105;
+    @apply hover:brightness-105 active:scale-[0.98];
   }
   .btn-pill-primary {
-    @apply btn-pill bg-accent text-white shadow-[0_6px_16px_rgba(31,180,207,0.28)];
+    @apply btn-pill bg-accent text-white shadow-[0_8px_20px_rgba(31,180,207,0.32)] hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(31,180,207,0.4)];
   }
   .btn-pill-ghost {
-    @apply btn-pill border-[1.5px] border-accent-soft bg-white text-accent-ink;
+    @apply btn-pill border-[1.5px] border-accent-soft bg-white/80 text-accent-ink backdrop-blur hover:border-accent;
+  }
+
+  /* Eyebrow label above section titles */
+  .eyebrow {
+    @apply text-center text-[12.5px] font-medium uppercase tracking-[2.5px] text-accent-ink;
+  }
+
+  /* Soft card surface used across sections */
+  .surface {
+    @apply rounded-card border border-line bg-card;
   }
 
   /* ── Admin primitives — mirror the game's .panel / .btn so the two feel alike. */
@@ -52,5 +63,61 @@ body {
   }
   .field {
     @apply rounded-lg border border-line bg-white px-3 py-2 text-ink outline-none focus:border-accent;
+  }
+}
+
+@layer utilities {
+  /* Accent gradient text (headline highlight) */
+  .text-gradient {
+    background-image: linear-gradient(100deg, theme('colors.accent') 0%, theme('colors.mint') 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Infinite horizontal marquee (duplicate content, translate -50%) */
+  .animate-marquee {
+    animation: marquee 42s linear infinite;
+  }
+  .marquee-group:hover .animate-marquee {
+    animation-play-state: paused;
+  }
+
+  .animate-float-slow {
+    animation: float 9s ease-in-out infinite;
+  }
+  .animate-float-slower {
+    animation: float 13s ease-in-out infinite;
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+  50% {
+    transform: translateY(-16px) translateX(6px);
+  }
+}
+
+/* Respect users who prefer less motion: no float/marquee, reveal shown at rest. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-marquee,
+  .animate-float-slow,
+  .animate-float-slower {
+    animation: none;
   }
 }

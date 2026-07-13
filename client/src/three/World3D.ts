@@ -16,10 +16,11 @@ import { demoStore } from '../ui/store/demoState';
 import type { AppearanceControl } from '../ui/appearanceControl';
 import { DayNightToggle, type MapVariant } from '../ui/DayNightToggle';
 import { LoadingBar } from '../ui/LoadingBar';
-import { loadCharacterAsset, buildAppearanceTexture, type CharacterAsset } from './CharacterAsset';
+import { loadCharacterAsset, buildAppearanceTexture, buildOutfitTexture, type CharacterAsset } from './CharacterAsset';
 import { loadEquipment, equipmentUrl, type EquipSlot } from './EquipmentLoader';
+import { loadCostume, costumeUrl } from './CostumeLoader';
 import { trimClips } from './CharacterAsset';
-import { dualWieldHands } from '../ui/equipmentIndex';
+import { dualWieldHands, defaultWeapon, getHeroCostumes, getHeroEquipment } from '../ui/equipmentIndex';
 import { LocalPlayer3D, RemotePlayer3D, PX_TO_UNIT } from './Player3D';
 import { OverheadLayer } from './Overhead';
 
@@ -188,9 +189,14 @@ export class World3D {
     } finally {
       this.loading.hide();
     }
+    // Everyone spawns in the novice starter kit: the 'scout' body costume + the
+    // hero's novice weapon (both filled only when the caller left them unset, so
+    // a deliberate "no outfit" / different weapon is preserved).
+    this.appearance = await this.withStarterDefaults(this.appearance);
     this.setupRenderer();
     this.setupWorld();
     this.setupPlayer();
+    await this.grantStarterKit();
     this.setupInput();
     this.setupNetwork();
     this.setupChat();
@@ -647,16 +653,52 @@ export class World3D {
     this.emitOnline();
   }
 
-  /** Apply a full appearance (body color/face texture + equipment) to a player. */
+  /** Apply a full appearance (body costume + color/face texture + equipment). */
   private async applyAppearance(
     player: LocalPlayer3D | RemotePlayer3D,
     characterId: string,
     appearance: Appearance,
   ) {
+    // Body costume: swap the whole body mesh onto the shared rig (the game's
+    // costume graft). Null = the bare "nude" base body baked into the glb.
+    const outfit = appearance.outfit ?? null;
+    if (outfit) {
+      const costume = await loadCostume(costumeUrl(characterId, outfit));
+      player.setOutfit(costume, outfit);
+      const otex = await buildOutfitTexture(characterId, outfit, appearance);
+      if (otex) player.setOutfitTexture(otex); // overlay the chosen face
+    } else {
+      player.setOutfit(null);
+    }
+    // Base-body texture (color + face) — carried by the bare body shown when no
+    // costume is worn.
     const tex = await buildAppearanceTexture(characterId, appearance);
     if (tex) player.setBodyTexture(tex);
     await this.applyEquipment(player, characterId, 'weapon', appearance.weapon ?? null);
     await this.applyEquipment(player, characterId, 'hat', appearance.hat ?? null);
+  }
+
+  /** Fill the starter outfit/weapon when the caller left them unset (a new
+   *  character). Keeps an explicit null (player took the outfit off) as-is. */
+  private async withStarterDefaults(a: Appearance): Promise<Appearance> {
+    const out = { ...a };
+    if (out.outfit === undefined) out.outfit = CONFIG.DEFAULT_OUTFIT;
+    if (out.weapon === undefined) out.weapon = await defaultWeapon(this.selfDef.id);
+    return out;
+  }
+
+  /** Mark the starter kit (outfit + novice weapon) owned so the customize panel
+   *  treats them as equippable — the store sells the rest. */
+  private async grantStarterKit() {
+    const hero = this.selfDef.id;
+    if (this.appearance.outfit) {
+      const i = (await getHeroCostumes(hero)).indexOf(this.appearance.outfit);
+      if (i >= 0) demoStore.grant(hero, 'outfit', i);
+    }
+    if (this.appearance.weapon) {
+      const i = (await getHeroEquipment(hero)).weapon.indexOf(this.appearance.weapon);
+      if (i >= 0) demoStore.grant(hero, 'weapon', i);
+    }
   }
 
   private async applyEquipment(

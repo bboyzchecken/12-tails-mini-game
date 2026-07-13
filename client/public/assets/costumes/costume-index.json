@@ -1,0 +1,14 @@
+{
+  "bat": ["bathRobe", "butterfly", "champion", "dreamCaster", "hallow", "illusionist", "japan", "legend", "nude", "pvpArmor", "queen", "royal", "santa", "scout", "shadowCaller", "shirt", "standard", "summer", "superStar", "teacher", "warlock"],
+  "bison": ["america", "beetle", "berserker", "champion", "defender", "gladiator", "hallow", "havoc", "legend", "nude", "pvpArmor", "royal", "santa", "scout", "sportman", "standard", "stoneage", "summer", "superStar", "warlord"],
+  "cat": ["adventurer", "assassin", "champion", "chinese", "dragonfly", "fur", "gambler", "hallow", "legend", "morocco", "nude", "pirate", "pvpArmor", "rogue", "royal", "santa", "scout", "standard", "summer", "superStar"],
+  "chameleon": ["buster", "champion", "china", "commander", "greek", "hallow", "legend", "mantis", "nude", "pvpArmor", "royal", "santa", "scout", "slayer", "snooker", "standard", "summer", "superStar", "tactician", "trickster"],
+  "mole": ["africa", "barrel", "bee", "bomber", "capital", "champion", "hallow", "infantry", "legend", "machinist", "nude", "pvpArmor", "royal", "santa", "scout", "standard", "steam", "steamSuit", "summer", "superStar", "trumpeter"],
+  "monkey": ["champion", "earthShaman", "english", "fireSear", "geomancer", "hallow", "legend", "magician", "nude", "pajamas", "pvpArmor", "pyromancer", "royal", "santa", "scout", "spider", "standard", "summer", "superStar", "theurgist"],
+  "panda": ["bib", "brawler", "champion", "fighter", "german", "hallow", "legend", "nude", "pvpArmor", "royal", "sage", "santa", "scout", "shinJitsu", "standard", "striker", "summer", "superStar", "worm", "wuxian"],
+  "penguin": ["archMage", "astralSage", "box", "champion", "fireFighter", "france", "frostMage", "hallow", "iceMage", "legend", "mosquito", "nude", "pvpArmor", "royal", "santa", "scout", "standard", "starSage", "summer", "superStar"],
+  "rabbit": ["alchemist", "ant", "champion", "hallow", "legend", "magistrate", "medic", "merchant", "nude", "nurse", "pvpArmor", "rainCoat", "royal", "santa", "scout", "spain", "standard", "summer", "superStar", "trader"],
+  "sheep": ["champion", "cleric", "enchanter", "fur", "hallow", "hierophant", "holyRobe", "legend", "lightSeer", "moth", "nude", "pvpArmor", "royal", "russia", "santa", "scout", "standard", "summer", "superStar", "waitress"],
+  "whale": ["aquaKnight", "champion", "chef", "hallow", "justice", "korea", "ladyBug", "lancer", "legend", "lifebuoy", "nude", "partisan", "pvpArmor", "royal", "santa", "scout", "standard", "summer", "superStar", "templar"],
+  "wolf": ["blade", "butler", "champion", "hallow", "hero", "legend", "novice", "nude", "paladin", "pvpArmor", "royal", "santa", "scorpion", "scout", "shirt", "soldier", "standard", "summer", "superStar", "thai", "vagabond"]
+}

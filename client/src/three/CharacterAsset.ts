@@ -187,6 +187,56 @@ async function composeAppearance(id: string, a: Appearance): Promise<THREE.Textu
   }
 }
 
+/**
+ * Composite a worn costume's body texture: the costume's flat color-1 atlas
+ * (`assets/costumes/<hero>/<outfit>.png`, copied beside the glb) with the
+ * player's chosen face overlay baked into the same top-left quadrant the nude
+ * atlas uses — every costume atlas shares that face+fur layout, so the same
+ * overlay lands right. Returns null if the atlas png isn't present (the outfit
+ * then just keeps the default face baked into its glb). Cached per hero:outfit:face.
+ *
+ * The costume's color follows the chosen body color: each costume ships its 5
+ * color-variant atlases at `costumes/<hero>/<outfit>/<color>.png` (imported by
+ * tools/import-costume-colors), falling back to the flat `<outfit>.png` (color 1)
+ * if the per-color set is missing. Cached per hero:outfit:color:face.
+ */
+export function buildOutfitTexture(
+  hero: string,
+  outfit: string,
+  a: Appearance,
+): Promise<THREE.Texture | null> {
+  const key = `outfit:${hero}:${outfit}:${a.color}:${a.face}`;
+  let p = texCache.get(key);
+  if (!p) {
+    p = composeOutfit(hero, outfit, a);
+    texCache.set(key, p);
+  }
+  return p;
+}
+
+async function composeOutfit(hero: string, outfit: string, a: Appearance): Promise<THREE.Texture | null> {
+  try {
+    const base = await loadImage(`assets/costumes/${hero}/${outfit}/${a.color}.png`)
+      .catch(() => loadImage(`assets/costumes/${hero}/${outfit}.png`));
+    const face = await loadImage(cosmeticUrl(hero, 'face', a.face)).catch(() => null);
+    const canvas = document.createElement('canvas');
+    canvas.width = base.width;
+    canvas.height = base.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(base, 0, 0);
+    if (face) ctx.drawImage(face, 0, 0, canvas.width / 2, canvas.height / 2);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.flipY = false; // glb UVs are not flipped
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  } catch {
+    return null; // no atlas png — keep the glb's baked default-face texture
+  }
+}
+
 function loadImage(url: string): Promise<HTMLImageElement> {
   let p = imgCache.get(url);
   if (!p) {

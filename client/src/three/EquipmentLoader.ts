@@ -17,20 +17,23 @@ const MOUNT_PATTERNS: Record<'weapon' | 'weaponL', RegExp[]> = {
 };
 
 /**
- * Hats seat on the skeleton `Head` bone (head base/centre), NOT `mount_Overhead`
- * — that empty sits at the crown, which floats the hat above the skull. Seating
- * on `Head` drops the hat's authored bulk over the head so it engulfs it (the
- * game's "hat is almost a second head" look). rabbit's own `Head` bone sits
- * abnormally low (below the ears), so it uses its `mount_Head` empty instead.
+ * Hats/accessories seat on the head *crown* mount — the empty the game parents
+ * the mAcc slot to. In every rig it hangs off the `Head` bone, identity-rotated
+ * and offset ~0.4u up at the crown; the hat prefab's authored pose (local pos 0)
+ * is built to sit there. Seating on the `Head` bone itself (head-centre) instead
+ * drops every hat ~0.4u into the skull — the "sunk into the head" look.
+ *
+ * Spellings vary across the ripped rigs (`mount_OverHead` / `mount_Overhead` /
+ * `Mount_OverHead` on most, `mount_Head` on chameleon+rabbit) and mole ships
+ * both a crown `mount_OverHead` and a lower `mount_Head`, so prefer OverHead,
+ * then Head-mount. bison/penguin/whale ship no crown mount at all → fall back to
+ * the `Head` bone, and Player3D lifts the hat to the crown there.
  */
-const HAT_BONE_BY_HERO: Record<string, RegExp[]> = {
-  rabbit: [/^mount_?head$/i, /^head$/i],
-};
-const HAT_BONE_DEFAULT: RegExp[] = [/^head$/i, /^mount_?head$/i];
+const HAT_BONE_DEFAULT: RegExp[] = [/^mount_?overhead$/i, /^mount_?head$/i, /^head$/i];
 
 /** Bone-name patterns to try (in priority order) for a hero's equipment slot. */
-export function mountPatterns(hero: string, slot: EquipSlot): RegExp[] {
-  if (slot === 'hat') return HAT_BONE_BY_HERO[hero] ?? HAT_BONE_DEFAULT;
+export function mountPatterns(_hero: string, slot: EquipSlot): RegExp[] {
+  if (slot === 'hat') return HAT_BONE_DEFAULT;
   return MOUNT_PATTERNS[slot];
 }
 

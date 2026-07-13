@@ -10,7 +10,7 @@ import { trackBuyIntent } from '../../net/track';
  * Cosmetic id = `${heroId}:${type}:${index}` (type = 'color' | 'face').
  */
 
-export type CosmeticType = 'color' | 'face' | 'weapon' | 'hat';
+export type CosmeticType = 'color' | 'face' | 'weapon' | 'hat' | 'outfit';
 export type Rarity = 'common' | 'rare' | 'epic';
 
 const STORAGE_KEY = '12tails-demo-store-v1';
@@ -37,6 +37,7 @@ export function priceOf(type: CosmeticType, index: number): number {
   if (type === 'color') return [0, 250, 400, 700, 1200][index] ?? 500;
   if (type === 'face') return 120 + index * 40; // faces climb gently
   if (type === 'weapon') return 350 + index * 45; // held gear costs more
+  if (type === 'outfit') return 500 + index * 60; // full-body costumes priciest
   return 200 + index * 35; // hats
 }
 

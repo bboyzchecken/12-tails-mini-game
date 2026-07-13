@@ -44,6 +44,42 @@ export async function getHeroEquipment(hero: string): Promise<HeroEquipment> {
   };
 }
 
+/** Secondary novice pieces that aren't the main held weapon (chameleon nocks a
+ *  noviceArrow on its noviceBow; whale pairs a noviceShield with its noviceLance). */
+const NOVICE_SECONDARY = /(arrow|shield)$/i;
+
+/**
+ * The starter weapon for a hero = its `novice*` item (every hero ships one).
+ * Picks the main weapon, skipping the arrow/shield secondary of the bow/lance
+ * heroes. Returns null if the hero somehow has no novice weapon.
+ */
+export async function defaultWeapon(hero: string): Promise<string | null> {
+  const list = (await getHeroEquipment(hero)).weapon;
+  const novice = list.filter((w) => /^novice/i.test(w));
+  return novice.find((w) => !NOVICE_SECONDARY.test(w)) ?? novice[0] ?? null;
+}
+
+// --------------------------------------------------------------- costumes
+
+type CostumeIndex = Record<string, string[]>;
+let costumeCache: Promise<CostumeIndex> | null = null;
+
+function loadCostumes(): Promise<CostumeIndex> {
+  costumeCache ??= fetch('assets/costumes/costume-index.json')
+    .then((r) => r.json())
+    .catch(() => ({}) as CostumeIndex);
+  return costumeCache;
+}
+
+/**
+ * Body-costume ids available for a hero (the outfit slot). Excludes `nude` —
+ * an empty outfit (null) already shows the bare base body baked into the glb.
+ */
+export async function getHeroCostumes(hero: string): Promise<string[]> {
+  const list = (await loadCostumes())[hero] ?? [];
+  return list.filter((c) => c.toLowerCase() !== 'nude');
+}
+
 /**
  * For a dual-wield hero, resolve which mesh goes in each hand for the chosen
  * weapon id. Explicit `_l`/`_r` pairs split across the hands; anything else is

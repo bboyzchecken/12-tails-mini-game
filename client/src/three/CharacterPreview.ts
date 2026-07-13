@@ -5,8 +5,10 @@ import {
   loadCharacterAsset,
   instantiateCharacter,
   buildAppearanceTexture,
+  buildOutfitTexture,
   type CharacterInstance,
 } from './CharacterAsset';
+import { loadCostume, costumeUrl, applyOutfit, type OutfitBinding } from './CostumeLoader';
 
 /**
  * A small self-contained 3D viewer for the character-select screen: shows one
@@ -23,6 +25,7 @@ export class CharacterPreview {
   private current: CharacterInstance | null = null;
   private currentId = '';
   private loadSeq = 0;
+  private outfitBinding: OutfitBinding | null = null;
 
   constructor(private container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -64,6 +67,7 @@ export class CharacterPreview {
     if (seq !== this.loadSeq) return; // a newer selection won the race
 
     if (this.current) this.scene.remove(this.current.group);
+    this.outfitBinding = null; // old instance discarded → its graft is moot
     this.current = instantiateCharacter(asset);
     this.currentId = def.id;
     this.scene.add(this.current.group);
@@ -75,14 +79,43 @@ export class CharacterPreview {
     await this.setAppearance(appearance);
   }
 
-  /** Apply color/face to the shown character. */
+  /** Apply outfit + color/face to the shown character. */
   async setAppearance(appearance: Appearance) {
     if (!this.current) return;
     const inst = this.current;
+    await this.applyOutfit(inst, appearance);
     const tex = await buildAppearanceTexture(this.currentId, appearance);
     if (tex && this.current === inst) {
       for (const m of inst.materials) {
         m.map = tex;
+        m.needsUpdate = true;
+      }
+    }
+  }
+
+  /** Graft the body costume onto the shown character (or clear it) — the same
+   *  whole-body swap the world uses, so the preview matches what spawns. */
+  private async applyOutfit(inst: CharacterInstance, appearance: Appearance) {
+    if (this.outfitBinding) {
+      this.outfitBinding.restore();
+      this.outfitBinding = null;
+    }
+    const outfit = appearance.outfit ?? null;
+    if (!outfit) return;
+    const costume = await loadCostume(costumeUrl(this.currentId, outfit));
+    if (!costume || this.current !== inst) return;
+    let body: THREE.SkinnedMesh | null = null;
+    inst.group.traverse((o) => {
+      if (!body && (o as THREE.SkinnedMesh).isSkinnedMesh) body = o as THREE.SkinnedMesh;
+    });
+    if (!body) return;
+    const binding = applyOutfit(body, costume);
+    if (!binding) return;
+    this.outfitBinding = binding;
+    const otex = await buildOutfitTexture(this.currentId, outfit, appearance);
+    if (otex && this.current === inst) {
+      for (const m of binding.materials) {
+        m.map = otex;
         m.needsUpdate = true;
       }
     }

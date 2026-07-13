@@ -26,7 +26,7 @@ export class CharacterSelect {
   private preview: CharacterPreview;
   private index: CosmeticsIndex = {};
   private selected = 0;
-  private appearance: Appearance = { color: 0, face: 0 };
+  private appearance: Appearance = { color: 0, face: 0, outfit: CONFIG.DEFAULT_OUTFIT };
   private colorWrap!: HTMLDivElement;
   private faceWrap!: HTMLDivElement;
   private cardEls: HTMLButtonElement[] = [];
@@ -103,7 +103,7 @@ export class CharacterSelect {
 
   private select(i: number) {
     this.selected = i;
-    this.appearance = { color: 0, face: 0 };
+    this.appearance = { color: 0, face: 0, outfit: CONFIG.DEFAULT_OUTFIT };
     this.cardEls.forEach((c, idx) => c.classList.toggle('on', idx === i));
     const def = CHARACTERS[i];
     (this.root.querySelector('.cs-tribe') as HTMLElement).textContent = def.tribe || ' ';
@@ -150,6 +150,7 @@ export class CharacterSelect {
   private randomize() {
     const { colors, faces } = this.counts();
     this.appearance = {
+      ...this.appearance, // keep the starter outfit
       color: Math.floor(Math.random() * colors),
       face: Math.floor(Math.random() * faces),
     };

@@ -1,6 +1,6 @@
 import type { Appearance } from '@12tails/shared/events';
 import type { AppearanceControl } from './appearanceControl';
-import { getHeroEquipment } from './equipmentIndex';
+import { getHeroEquipment, getHeroCostumes } from './equipmentIndex';
 import { getEquipThumb } from './EquipThumbs';
 import { demoStore, type CosmeticType } from './store/demoState';
 import { applyFaceFrame } from './faceFrame';
@@ -32,6 +32,7 @@ export class CustomizePanel {
   private open = false;
   private counts = { colors: 1, faces: 1 };
   private equip: Record<'weapon' | 'hat', string[]> = { weapon: [], hat: [] };
+  private outfits: string[] = [];
   private unsub: () => void;
 
   private readonly onDocPointerDown = (e: PointerEvent) => {
@@ -70,6 +71,7 @@ export class CustomizePanel {
       /* keep defaults */
     }
     this.equip = await getHeroEquipment(this.opts.control.characterId);
+    this.outfits = await getHeroCostumes(this.opts.control.characterId);
     if (this.open) this.render();
   }
 
@@ -94,6 +96,7 @@ export class CustomizePanel {
 
     this.panel.appendChild(this.imageGrid('สี', this.counts.colors, 'color', cur.color));
     this.panel.appendChild(this.imageGrid('หน้า', this.counts.faces, 'face', cur.face));
+    this.panel.appendChild(this.outfitGrid('ชุด', cur.outfit ?? null));
     this.panel.appendChild(this.equipGrid('อาวุธ', 'weapon', cur.weapon ?? null));
     this.panel.appendChild(this.equipGrid('หมวก', 'hat', cur.hat ?? null));
 
@@ -164,17 +167,49 @@ export class CustomizePanel {
       b.addEventListener('click', () => this.commit({ [slot]: name }));
       g.appendChild(b);
     }
-    if (ownedCount === 0) {
-      const buy = document.createElement('button');
-      buy.textContent = '🛒 ซื้อในร้าน';
-      buy.style.cssText =
-        `grid-column:span 4;white-space:nowrap;font-size:12px;padding:0 10px;height:${SWATCH}px;` +
-        'border-radius:9px;cursor:pointer;border:1px dashed var(--panel-line,#ecdfce);' +
-        'background:transparent;color:var(--ui-muted,#97897a);';
-      buy.addEventListener('click', () => this.opts.onOpenStore());
-      g.appendChild(buy);
-    }
+    if (ownedCount === 0) g.appendChild(this.buyMore());
     return wrap;
+  }
+
+  // -- outfit: a "take off" (nude) cell + owned body costumes (name labels) --
+
+  private outfitGrid(title: string, current: string | null): HTMLDivElement {
+    const hero = this.opts.control.characterId;
+    const wrap = this.section(title);
+    const g = wrap.querySelector('.cz-grid') as HTMLDivElement;
+
+    const none = this.cell(current == null);
+    none.textContent = '∅';
+    none.style.fontSize = '16px';
+    none.title = 'ถอดชุด (ร่างเปล่า)';
+    none.addEventListener('click', () => this.commit({ outfit: null }));
+    g.appendChild(none);
+
+    let ownedCount = 0;
+    for (let n = 0; n < this.outfits.length; n++) {
+      if (!demoStore.isOwned(hero, 'outfit', n)) continue;
+      ownedCount++;
+      const name = this.outfits[n];
+      const b = this.cell(current === name);
+      b.textContent = pretty(name).slice(0, 4);
+      b.title = pretty(name);
+      b.style.fontSize = '9px';
+      b.addEventListener('click', () => this.commit({ outfit: name }));
+      g.appendChild(b);
+    }
+    if (ownedCount === 0) g.appendChild(this.buyMore());
+    return wrap;
+  }
+
+  private buyMore(): HTMLButtonElement {
+    const buy = document.createElement('button');
+    buy.textContent = '🛒 ซื้อในร้าน';
+    buy.style.cssText =
+      `grid-column:span 4;white-space:nowrap;font-size:12px;padding:0 10px;height:${SWATCH}px;` +
+      'border-radius:9px;cursor:pointer;border:1px dashed var(--panel-line,#ecdfce);' +
+      'background:transparent;color:var(--ui-muted,#97897a);';
+    buy.addEventListener('click', () => this.opts.onOpenStore());
+    return buy;
   }
 
   // ------------------------------------------------------------- primitives

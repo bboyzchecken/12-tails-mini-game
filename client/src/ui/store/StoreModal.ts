@@ -1,6 +1,6 @@
 import type { Appearance } from '@12tails/shared/events';
 import type { AppearanceControl } from '../appearanceControl';
-import { getHeroEquipment } from '../equipmentIndex';
+import { getHeroEquipment, getHeroCostumes } from '../equipmentIndex';
 import { getEquipThumb } from '../EquipThumbs';
 import { trackShopOpen } from '../../net/track';
 import {
@@ -15,13 +15,15 @@ const RARITY_COLOR: Record<Rarity, string> = {
 const TABS: { key: CosmeticType; label: string }[] = [
   { key: 'color', label: 'สี' },
   { key: 'face', label: 'หน้า' },
+  { key: 'outfit', label: 'ชุด' },
   { key: 'weapon', label: 'อาวุธ' },
   { key: 'hat', label: 'หมวก' },
 ];
-const NONE = -1; // "no item" selection for equipment slots
+const NONE = -1; // "no item" selection for name-based slots (weapon/hat/outfit)
 
-function isEquip(t: CosmeticType): t is 'weapon' | 'hat' {
-  return t === 'weapon' || t === 'hat';
+/** Name-based slots (id string + a "none" cell), vs the index-based color/face. */
+function isEquip(t: CosmeticType): t is 'weapon' | 'hat' | 'outfit' {
+  return t === 'weapon' || t === 'hat' || t === 'outfit';
 }
 
 /** camelCase glb name -> readable label. */
@@ -41,7 +43,7 @@ export class StoreModal {
   private jilLabel!: HTMLSpanElement;
   private tab: CosmeticType = 'color';
   private cosmeticCounts: Record<'color' | 'face', number> = { color: 1, face: 1 };
-  private equip: Record<'weapon' | 'hat', string[]> = { weapon: [], hat: [] };
+  private equip: Record<'weapon' | 'hat' | 'outfit', string[]> = { weapon: [], hat: [], outfit: [] };
   private selected = 0;
   private equipped: Appearance;
   private unsub: () => void;
@@ -69,7 +71,7 @@ export class StoreModal {
     (this.root.querySelector('.store-reset') as HTMLButtonElement)
       .addEventListener('click', () => {
         demoStore.reset();
-        this.equipped = { color: 0, face: 0, weapon: null, hat: null };
+        this.equipped = { color: 0, face: 0, weapon: null, hat: null, outfit: null };
         this.control.commit(this.equipped);
         this.selected = this.equippedIndex();
         this.render();
@@ -102,7 +104,8 @@ export class StoreModal {
     } catch {
       /* keep defaults */
     }
-    this.equip = await getHeroEquipment(this.control.characterId);
+    const eq = await getHeroEquipment(this.control.characterId);
+    this.equip = { ...eq, outfit: await getHeroCostumes(this.control.characterId) };
     this.render();
   }
 
@@ -156,12 +159,16 @@ export class StoreModal {
         label.className = 'store-cell-label';
         label.textContent = pretty(name); // fallback until the 3D thumb lands
         cell.appendChild(label);
-        void getEquipThumb(hero, tab, name).then((url) => {
-          if (!url || !cell.isConnected) return;
-          label.remove();
-          cell.classList.add('thumb');
-          cell.style.backgroundImage = `url(${url})`;
-        });
+        // Weapons/hats have rendered 3D thumbs; costumes (whole-body meshes)
+        // just show their name for now.
+        if (tab === 'weapon' || tab === 'hat') {
+          void getEquipThumb(hero, tab, name).then((url) => {
+            if (!url || !cell.isConnected) return;
+            label.remove();
+            cell.classList.add('thumb');
+            cell.style.backgroundImage = `url(${url})`;
+          });
+        }
       } else {
         cell.style.backgroundImage = `url(assets/cosmetics/${hero}/${tab}/${n}.png)`;
       }

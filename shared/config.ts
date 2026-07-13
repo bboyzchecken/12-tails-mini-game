@@ -15,6 +15,13 @@ export const CONFIG = {
   SPAWN: { x: -415, y: 346 },
   DEMO_STORE: true,         // เปิดชั้น UI โมเดลรายได้ (mock ทั้งหมด — ดู 12tails-demo-monetization-plan.md)
 
+  // ชุดเริ่มต้น (novice) ที่ทุกตัวใส่ตอนเข้าเกม — costume prefab ชื่อ 'scout'
+  // มีครบทั้ง 12 ตัว (ผู้เล่นใหม่ในเกมจริงเริ่มด้วยชุดนี้). null = ร่างเปล่า (nude)
+  DEFAULT_OUTFIT: 'scout',
+  // อาวุธเริ่มต้น = ชิ้นที่ชื่อขึ้นต้น 'novice' ของแต่ละตัว (resolve จาก equipment-index
+  // ตอน runtime — ดู ui/equipmentIndex.ts defaultWeapon)
+  DEFAULT_WEAPON_PREFIX: 'novice',
+
   // ---- ระบบแสดงความรู้สึก (id ตรงชื่อไฟล์จากเกมจริง) ----
   // ลูกโป่งอารมณ์เหนือหัว (assets/ui/bubbles/<id>.png)
   EMOTE_BUBBLES: [
