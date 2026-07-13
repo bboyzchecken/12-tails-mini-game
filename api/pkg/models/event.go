@@ -23,4 +23,15 @@ type Event struct {
 // EventStore is the data-access contract for events.
 type EventStore interface {
 	Create(e *Event) error
+
+	// Phase 4 admin aggregates — all bounded to the half-open range [from, to).
+	UniqueSessions(from, to time.Time) (int64, error)
+	UniqueAccounts(from, to time.Time) (int64, error)
+	CountByType(eventType string, from, to time.Time) (int64, error)
+	WouldBeRevenue(from, to time.Time) (int64, error)
+	Funnel(stages []string, from, to time.Time) ([]FunnelStage, error)
+	Demand(from, to time.Time, limit int) ([]DemandRow, error)
+	TimeSeries(from, to time.Time) ([]DailyPoint, error)
+	Referrers(from, to time.Time, limit int) ([]CountRow, error)
+	ListForExport(from, to time.Time, limit int) ([]*Event, error)
 }

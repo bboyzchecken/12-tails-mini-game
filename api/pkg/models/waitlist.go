@@ -15,4 +15,6 @@ type WaitlistStore interface {
 	// Create inserts the signup, deduping on email. created=false means the
 	// email was already on the list (idempotent, no error).
 	Create(w *Waitlist) (created bool, err error)
+	// Count is the total number of signups (admin dashboard card).
+	Count() (int64, error)
 }

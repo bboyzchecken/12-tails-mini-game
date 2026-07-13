@@ -16,4 +16,6 @@ type TopUp struct {
 type TopUpStore interface {
 	Create(t *TopUp) error
 	ListByUser(userID string) ([]*TopUp, error)
+	// TotalsByUser aggregates demo top-ups per account (admin dashboard).
+	TotalsByUser(limit int) ([]TopUpTotal, error)
 }

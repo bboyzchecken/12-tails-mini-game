@@ -207,13 +207,13 @@
 - [ ] consent banner (Zustand) + ลิงก์ privacy · responsive มือถือ
 - **AC:** landing เปิดสวย ลงมือถือ · กรอก waitlist → มี row · เข้าเกมจากปุ่มได้ · event ถูกยิง
 
-### Phase 4 — Admin dashboard ⭐  `(= L3–L4)`
-- [ ] **Go:** admin auth ด้วย JWT ของเทมเพลต (seed 1 admin user, `POST /auth/login` → JWT, `/admin/*` = `JwtMiddleware`+`IsAdmin`) — ไม่เปิด public register
-- [ ] **Go:** `/admin/metrics` (aggregate SQL): cards (unique session/players/waitlist/DAU · **registered users/MAU**) · funnel counts · **demand ranking** (group by `item_id`) · would-be revenue (Σ intent×price) · **ประวัติเติมเงิน(demo) ต่อบัญชี** · time series · referrers
-- [ ] **Go:** `/admin/events/export` → CSV
-- [ ] **Web:** `/admin` (protected) + หน้า login · date filter (Zustand) · ดึงผ่าน **TanStack Query**
+### Phase 4 — Admin dashboard ⭐  `(= L3–L4)` 🟡 Go backend เสร็จ · Web ต่อ
+- [x] **Go:** admin auth ✅ — seed admin จาก env (`ADMIN_EMAIL`/`ADMIN_PASSWORD`, `seedAdmin` ตอน startup, ไม่เปิด public admin register) · `POST /auth/login` → JWT · `/admin/*` = `JwtMiddleware`+`IsAdmin` (verify: no token→401, non-admin→403)
+- [x] **Go:** `/admin/metrics` ✅ (aggregate SQL, `?from`/`?to` filter): cards (unique_sessions · active_accounts/MAU · registered_users · waitlist · buy_intents · would_be_revenue) · **funnel** (distinct sessions/stage: game_open→play_start→shop_open→buy_intent) · **demand ranking** (group by `item_id` + Σ price จาก jsonb) · time series (รายวัน) · referrers · **ประวัติเติมเงิน(demo) ต่อบัญชี** (join users) · nil→[] coercion
+- [x] **Go:** `/admin/events/export` → CSV ✅ (`Content-Disposition: attachment`, ทุกคอลัมน์ + meta jsonb, `?from`/`?to`/`?limit`)
+- [ ] **Web:** `/admin` (protected) + หน้า login · date filter (Zustand) · ดึงผ่าน **TanStack Query** — ต้อง scaffold `/web` (Phase 3) ก่อน
 - [ ] **Web:** charts — top-line cards · funnel % · **★ bar chart "ชุดที่คนอยากซื้อสุด"** · would-be revenue (ระบุ *"ประมาณการจากความสนใจ ไม่ใช่ยอดขาย"*) · time series · ปุ่ม export CSV
-- **AC:** เห็น "ชุดที่คนอยากซื้อสุด" เป็นกราฟ + funnel % ถูก + export CSV ได้
+- **AC (Go ✅ verify แล้ว):** demand ranking + funnel + would-be revenue + CSV ทำงานจริงกับ Postgres · **เหลือ Web:** กราฟ "ชุดที่คนอยากซื้อสุด" + funnel % + ปุ่ม export
 
 ### Phase 5 — Season scheduling  `(= S0–S4)`
 - [ ] **Go:** domain **Collection** + **CosmeticItem** (+ seed "ชุดฤดูร้อน") + `utils/liveness` (`isLiveNow`/`statusLabel` — **computed on read, ไม่มี cron**)

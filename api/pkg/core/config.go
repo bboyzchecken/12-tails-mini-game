@@ -14,6 +14,12 @@ type Config struct {
 	ClientOrigin string // comma-separated allowed CORS origins (game client + landing)
 	JwtSecret    string // unused in Phase 1; reserved for player/admin auth (Phase P)
 	Postgres     PostgresConfig
+
+	// Admin dashboard seed (Phase 4). When email+password are set, an admin
+	// account is created on startup if it does not already exist.
+	AdminEmail      string
+	AdminPassword   string
+	AdminFamilyName string
 }
 
 type PostgresConfig struct {
@@ -53,6 +59,9 @@ func Load() Config {
 			Database: env("POSTGRES_DB", "twelvetails"),
 			SSLMode:  env("POSTGRES_SSLMODE", "disable"),
 		},
+		AdminEmail:      env("ADMIN_EMAIL", ""),
+		AdminPassword:   env("ADMIN_PASSWORD", ""),
+		AdminFamilyName: env("ADMIN_FAMILY_NAME", "Admin"),
 	}
 }
 

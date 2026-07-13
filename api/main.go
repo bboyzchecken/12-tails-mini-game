@@ -4,18 +4,22 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/mac-checken/12tails-api/pkg/core"
 	"github.com/mac-checken/12tails-api/pkg/db"
 	"github.com/mac-checken/12tails-api/pkg/handlers/api"
 	"github.com/mac-checken/12tails-api/pkg/logger"
+	"github.com/mac-checken/12tails-api/pkg/models"
 	characterstore "github.com/mac-checken/12tails-api/pkg/store/character"
 	eventstore "github.com/mac-checken/12tails-api/pkg/store/event"
 	topupstore "github.com/mac-checken/12tails-api/pkg/store/topup"
@@ -57,9 +61,45 @@ func main() {
 			topupstore.New,
 			api.NewServer,
 		),
+		fx.Invoke(seedAdmin),
 		fx.Invoke(registerServer),
 		fx.WithLogger(func() fxevent.Logger { return fxevent.NopLogger }),
 	).Run()
+}
+
+// seedAdmin creates the dashboard admin account on startup when ADMIN_EMAIL +
+// ADMIN_PASSWORD are set and it does not already exist. There is no public admin
+// register — this is the only way an admin (role=admin) is created.
+func seedAdmin(cfg core.Config, log *logrus.Logger, us models.UserStore) {
+	if cfg.AdminEmail == "" || cfg.AdminPassword == "" {
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(cfg.AdminEmail))
+	if _, err := us.FindByEmail(email); err == nil {
+		return // already seeded
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(cfg.AdminPassword), bcrypt.DefaultCost)
+	if err != nil {
+		log.WithError(err).Error("admin seed: could not hash password")
+		return
+	}
+	family := strings.TrimSpace(cfg.AdminFamilyName)
+	if family == "" {
+		family = "Admin"
+	}
+	u := &models.User{
+		ID:           uuid.NewString(),
+		Email:        email,
+		FamilyName:   family,
+		PasswordHash: string(hash),
+		Role:         "admin",
+		Status:       "active",
+	}
+	if err := us.Create(u); err != nil {
+		log.WithError(err).Warn("admin seed: create failed (email/family name may be taken)")
+		return
+	}
+	log.Infof("seeded admin account %s", email)
 }
 
 // registerServer starts/stops the Echo server on the FX lifecycle.

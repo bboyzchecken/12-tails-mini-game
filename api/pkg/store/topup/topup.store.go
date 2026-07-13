@@ -17,3 +17,16 @@ func (s *topUpStore) ListByUser(userID string) ([]*models.TopUp, error) {
 	err := s.db.Where("user_id = ?", userID).Order("created_at desc").Find(&ts).Error
 	return ts, err
 }
+
+func (s *topUpStore) TotalsByUser(limit int) ([]models.TopUpTotal, error) {
+	var rows []models.TopUpTotal
+	err := s.db.Raw(`
+		SELECT t.user_id, u.family_name, u.email,
+		       sum(t.amount_jil) AS total_jil, count(*) AS count
+		FROM top_ups t
+		JOIN users u ON u.id = t.user_id
+		GROUP BY t.user_id, u.family_name, u.email
+		ORDER BY total_jil DESC
+		LIMIT ?`, limit).Scan(&rows).Error
+	return rows, err
+}

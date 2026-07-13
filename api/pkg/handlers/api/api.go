@@ -80,6 +80,12 @@ func (s *Server) build() *echo.Echo {
 	me.POST("/topup", s.TopUp)
 	me.GET("/topups", s.ListTopups)
 
+	// Admin dashboard (Phase 4): JWT + role=admin. No public register for admin —
+	// the account is seeded from env on startup.
+	admin := e.Group("/admin", s.JwtMiddleware(), s.IsAdmin())
+	admin.GET("/metrics", s.AdminMetrics)
+	admin.GET("/events/export", s.AdminExport)
+
 	return e
 }
 

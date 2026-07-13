@@ -22,3 +22,9 @@ func (s *waitlistStore) Create(w *models.Waitlist) (bool, error) {
 	}
 	return res.RowsAffected > 0, nil
 }
+
+func (s *waitlistStore) Count() (int64, error) {
+	var n int64
+	err := s.db.Model(&models.Waitlist{}).Count(&n).Error
+	return n, err
+}
