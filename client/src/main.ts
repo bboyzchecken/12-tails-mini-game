@@ -2,6 +2,7 @@ import { CONFIG } from '@12tails/shared/config';
 import { connectSocket } from './net/socket';
 import { trackGameOpen } from './net/track';
 import { bootEntry } from './boot';
+import { mountOrientationGate } from './ui/OrientationGate';
 import { mountDemoBanner } from './ui/store/DemoBanner';
 import { mountControlHints } from './ui/hud/ControlHints';
 import { mountLocationTitle } from './ui/hud/LocationTitle';
@@ -26,6 +27,7 @@ connectSocket();
 
 // DOM UI overlay (12tails-ui-roadmap.md): DEMO banner ค้างตลอด + Core HUD (U1)
 // HUD ซ่อนตัวเองจนกว่าข้อมูลแรกจะไหลมาทาง bus (หลังเข้า WorldScene)
+mountOrientationGate();
 mountDemoBanner();
 mountLocationTitle();
 mountPlayerHUD();

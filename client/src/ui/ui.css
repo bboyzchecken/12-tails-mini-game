@@ -1227,3 +1227,129 @@ body.touch .chat-input-wrap input {
 .cs-back:hover {
   background: rgba(30, 180, 207, 0.35);
 }
+
+/* ── Orientation lock: ask a phone held in portrait to rotate ────────────── */
+.orient-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 9999; /* above every panel, modal, and the joystick */
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  text-align: center;
+  pointer-events: auto; /* block the game underneath */
+  background: linear-gradient(180deg, #1b2b49 0%, #12182e 100%);
+  color: #fdf6ec;
+  font-family: var(--font-body);
+}
+.orient-gate.show {
+  display: flex;
+}
+.orient-phone {
+  position: relative;
+  width: 52px;
+  height: 92px;
+  border: 3px solid currentColor;
+  border-radius: 13px;
+  color: var(--ui-accent);
+  animation: orient-rotate 1.9s ease-in-out infinite;
+}
+/* home indicator so the outline reads as a phone as it turns */
+.orient-phone::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.6;
+}
+@keyframes orient-rotate {
+  0%, 28% { transform: rotate(0); }
+  55%, 100% { transform: rotate(-90deg); }
+}
+.orient-title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 21px;
+}
+.orient-sub {
+  margin: 0;
+  max-width: 320px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #c7d6ea;
+}
+
+/* ── Mobile landscape: fit panels into the short viewport (rotate → play) ── */
+@media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
+  /* Full-screen entry overlays: scroll from the top instead of overflowing. */
+  .charselect,
+  .authgate {
+    padding: 8px;
+    align-items: flex-start;
+  }
+  .charselect .cs-inner,
+  .auth-card,
+  .slots-wrap {
+    max-height: 96vh;
+    max-height: 96dvh;
+    overflow-y: auto;
+  }
+
+  /* Character select: keep the preview beside the controls, cap its height. */
+  .charselect .cs-inner {
+    gap: 8px;
+    padding: 10px;
+  }
+  .charselect .cs-title {
+    font-size: 18px;
+  }
+  .charselect .cs-main {
+    flex-direction: row;
+    gap: 10px;
+  }
+  .charselect .cs-preview {
+    flex: 0 0 40vw;
+    width: 40vw;
+    max-width: 300px;
+    height: auto;
+    min-height: 200px;
+  }
+  .charselect .cs-strip {
+    padding: 2px;
+  }
+
+  /* Auth card: trim vertical rhythm so the form + guest button both fit. */
+  .auth-card {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+  .auth-title {
+    font-size: 18px;
+  }
+  .auth-note {
+    display: none;
+  }
+
+  /* Modals: cap to the visible height and let their body scroll. */
+  .store-modal,
+  .profile-overlay {
+    padding: 8px;
+  }
+  .store-panel {
+    max-height: 94vh;
+    max-height: 94dvh;
+  }
+  .profile-card {
+    max-height: 94vh;
+    max-height: 94dvh;
+    overflow-y: auto;
+  }
+}
