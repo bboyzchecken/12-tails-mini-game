@@ -5,7 +5,7 @@ import type { Appearance } from '@12tails/shared/events';
  * → JWT stored in localStorage; guests skip it entirely. Character slots + the
  * permanent family name live server-side. See 12tails-web-BUILD-PLAN.md Phase P.
  */
-const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:5055').replace(/\/$/, '');
+export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:5055').replace(/\/$/, '');
 const TOKEN_KEY = '12tails-auth-token';
 
 export interface Account {

@@ -4,6 +4,7 @@ import { AuthPanel } from '../ui/AuthPanel';
 import { CharacterSlots } from '../ui/CharacterSlots';
 import * as api from '../net/api';
 import type { MeResponse } from '../net/api';
+import { trackPlayStart } from '../net/track';
 import type { WorldInit } from '../three/World3D';
 import { consumeEntryIntent } from '../boot';
 
@@ -119,6 +120,9 @@ export class CharacterSelectScene extends Phaser.Scene {
 
   private launch(init: WorldInit) {
     this.teardown();
+    // A guest has no account family name yet; account players enter the world
+    // with the JWT already stored, so track() attaches account_id too.
+    trackPlayStart(init.characterId, { guest: !init.familyName });
     // Dynamic import keeps three.js out of the boot bundle; launchWorld3D
     // destroys this Phaser game and takes over the #game container.
     void import('../three/World3D').then(({ launchWorld3D }) => launchWorld3D(init, this.game));

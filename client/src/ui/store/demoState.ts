@@ -1,4 +1,5 @@
 import { gameToUI } from '../bus';
+import { trackBuyIntent } from '../../net/track';
 
 /**
  * Client-side DEMO economy (12tails-demo-monetization-plan.md): a fake Jil
@@ -113,6 +114,15 @@ class DemoStore {
     this.jil -= price;
     this.owned.add(cosmeticId(hero, type, index));
     this.changed();
+    // Phase 2: the local unlock above is the demo; this reports demand to the
+    // funnel — someone would spend Jil on this item. NOT a real sale.
+    trackBuyIntent({
+      itemId: cosmeticId(hero, type, index),
+      itemType: type,
+      priceJil: price,
+      hero,
+      rarity: rarityOf(type, index),
+    });
     return true;
   }
 

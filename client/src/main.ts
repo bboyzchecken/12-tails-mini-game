@@ -1,5 +1,6 @@
 import { CONFIG } from '@12tails/shared/config';
 import { connectSocket } from './net/socket';
+import { trackGameOpen } from './net/track';
 import { bootEntry } from './boot';
 import { mountDemoBanner } from './ui/store/DemoBanner';
 import { mountControlHints } from './ui/hud/ControlHints';
@@ -9,6 +10,9 @@ import { mountPlayerHUD } from './ui/hud/PlayerHUD';
 // The entry flow can be re-created (e.g. after leaving the world), so it lives
 // in boot.ts and is launched here on startup.
 bootEntry();
+
+// Phase 2: turn traffic into demand data from the first load.
+trackGameOpen();
 
 if (import.meta.env.DEV) {
   import('./ui/bus').then((bus) => {

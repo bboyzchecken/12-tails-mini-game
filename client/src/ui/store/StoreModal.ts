@@ -2,6 +2,7 @@ import type { Appearance } from '@12tails/shared/events';
 import type { AppearanceControl } from '../appearanceControl';
 import { getHeroEquipment } from '../equipmentIndex';
 import { getEquipThumb } from '../EquipThumbs';
+import { trackShopOpen } from '../../net/track';
 import {
   demoStore, priceOf, rarityOf, type CosmeticType, type Rarity,
 } from './demoState';
@@ -89,6 +90,7 @@ export class StoreModal {
     }
 
     this.unsub = demoStore.subscribe(() => this.render());
+    trackShopOpen(this.tab); // constructed only on open (World3D guards double-open)
     void this.init();
   }
 

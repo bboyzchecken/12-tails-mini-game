@@ -39,7 +39,7 @@
 - [x] **Go API (`/api`) + PostgreSQL + `POST /track` + `POST /waitlist`** — ✅ **Phase 1 เสร็จ** (Echo+GORM+FX ตามเทมเพลต · build+vet ผ่าน · verify กับ Postgres จริง)
 - [ ] **Next.js frontend (`/web`)** (landing + admin) — ยังไม่มี
 - [ ] **บัญชีผู้เล่น + โปรไฟล์เกม** ⭐ — register/login, `family_name` ถาวร, `Character`+slots, nameplate 2 บรรทัด, ประวัติเติมเงิน (ตอนนี้ชื่อเป็น ephemeral ไม่มีบัญชี → นับคนจริง/รู้ว่าใครเติมไม่ได้)
-- [ ] **เกมยิง analytics** ⭐ — `demoStore.buy()` แค่แก้ localStorage **ไม่ส่ง `buy_intent` ไปที่ไหน** (จุดเชื่อมที่ขาดและสำคัญสุด)
+- [x] **เกมยิง analytics** ⭐ — ✅ **Phase 2 เสร็จ** · `client/src/net/track.ts` (session UUID + JWT→account_id) ยิง `game_open`/`play_start`/`shop_open`/`buy_intent` → `POST /track` · `demoStore.buy()` แนบ `item_id`+`price_jil` (verify กับ Postgres จริงแล้ว)
 - [ ] **Admin dashboard** — funnel, demand ranking, would-be revenue, CSV export
 - [ ] **Season scheduling** — `Collection`/`CosmeticItem`, `GET /store/active`, timeline
 - [ ] **ระบบตกปลา (backend)** — server-roll `POST /fishing/cast`, เกล็ด wallet, inventory/Fishdex, retention metrics (มีแต่ spec)
@@ -189,14 +189,14 @@
 - **AC (backend ✅ verify แล้ว):** สมัคร→ได้ family_name ถาวร + สร้าง character (slot 0-2, ตัวที่ 4 = 409) · dup family = 409 · password เก็บเป็น bcrypt · JWT กัน `/me/*` · topup history รวมยอดถูก · nameplate = family/name (ชื่อ family / ชื่อตัวละคร)
 - 🔜 **เหลือ game-side:** register/login UI ก่อนเข้าเกม · `CharacterSelect` → character-slot picker · nameplate 2 บรรทัด (`Overhead.ts`/`ChatBubble`) + `player:join` payload · แนบ JWT + `account_id` ในทุก event (คู่กับ Phase 2)
 
-### Phase 2 — เชื่อมเกม → API ⭐  `(= L2 ส่วนเกม)`
+### Phase 2 — เชื่อมเกม → API ⭐  `(= L2 ส่วนเกม)` ✅ เสร็จแล้ว
 > จุดเชื่อมสำคัญสุด: ทำให้เกมที่ deploy แล้วเริ่มส่งสัญญาณดีมานด์
-- [ ] client helper `track()` → POST ไป Go `/track` (base URL ผ่าน `VITE_API_URL`) + session UUID ใน localStorage
-- [ ] เมื่อ login แล้ว (Phase P) แนบ `account_id` ในทุก event เพิ่มจาก `session_id`
-- [ ] ยิง `game_open`, `play_start(character_id)`, `shop_open(tab)`
-- [ ] **`buy_intent`** — เพิ่มใน `demoStore.buy()` / `StoreModal`: แนบ `item_id`, `item_type`, `price_jil` **นอกเหนือ**จากปลดล็อกในเครื่อง
-- [ ] `gacha_pull` / `battlepass_intent` / `supporter_intent` (ถ้าเปิดพื้นผิวนั้น)
-- **AC:** เดินครบ flow ในเกม → event ถูกบันทึกทุกจุด, `buy_intent` มี `item_id`+`price_jil` จริง
+- [x] client helper `track()` → POST ไป Go `/track` (base URL ผ่าน `VITE_API_URL`) + session UUID ใน localStorage — `client/src/net/track.ts` (fire-and-forget, keepalive, ไม่ block เกม · เป็น **แหล่งเดียวของ event taxonomy** ฝั่งเกม → web mirror ทีหลัง)
+- [x] เมื่อ login แล้ว (Phase P) แนบ `account_id` ในทุก event เพิ่มจาก `session_id` — decode `user_id` จาก JWT
+- [x] ยิง `game_open` (`main.ts`), `play_start(character_id)` (`CharacterSelectScene.launch` · guest flag), `shop_open(tab)` (`StoreModal`)
+- [x] **`buy_intent`** — `demoStore.buy()` แนบ `item_id` (top-level) + `item_type`/`price_jil`/`rarity` (meta jsonb) **นอกเหนือ**จากปลดล็อกในเครื่อง
+- [ ] `gacha_pull` / `battlepass_intent` / `supporter_intent` — ⏭️ ยังไม่มีพื้นผิวนั้นในเดโม (เปิดเมื่อมี gacha/battlepass UI)
+- **AC:** ✅ เดินครบ flow ในเกม → event ถูกบันทึกทุกจุด (verify กับ Postgres จริง: 4 types + account_id ตอน login), `buy_intent` มี `item_id`+`price_jil` จริง
 
 ### Phase 3 — Next.js frontend + Landing  `(= L1)`
 - [ ] scaffold `/web`: Next.js ล่าสุด + TS + Tailwind + **Zustand + TanStack Query + Axios**
