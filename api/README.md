@@ -8,14 +8,20 @@
 
 ## Quick start
 
+env + docker อยู่ที่ **root ของ monorepo** (ไฟล์เดียวคุมทุก service):
+
 ```bash
-cp .env.example .env          # ปรับค่าได้ตามต้องการ
-docker compose up -d          # postgres:16 บน :5432
-go run .                      # start API บน :5000 (migrate อัตโนมัติ)
-# หรือรัน migration อย่างเดียว:  go run . up
+# จาก repo root — build+run ทั้ง stack (postgres + api + server + client)
+cp .env.example .env
+docker compose up --build
+
+# หรือ dev เฉพาะ API (ต่อ postgres ของ compose): จาก repo root
+docker compose up -d postgres
+cd api && go run .            # อ่าน ../.env, migrate อัตโนมัติ, ฟังที่ API_PORT (5055)
+# migration อย่างเดียว:  go run . up
 ```
 
-ตรวจสุขภาพ: `curl localhost:5000/health` → `{"ok":true,"service":"12tails-api"}`
+ตรวจสุขภาพ: `curl localhost:5055/health` → `{"ok":true,"service":"12tails-api"}`
 
 ## Endpoints
 

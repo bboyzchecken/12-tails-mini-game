@@ -106,10 +106,13 @@
 
 ```
 12-tails-mini-game/
-  /client  /server  /shared           (เกม — Phaser · Socket.IO relay · TS contracts, เดิม)
+  docker-compose.yml  .env(.example)   ★ คุมทั้ง stack — build+run ครั้งเดียว (env รวมที่เดียว, section ต่อ service)
+  .dockerignore
+  /client  /server  /shared           (เกม — Phaser · Socket.IO relay · TS contracts)
+    client/Dockerfile · client/nginx.conf · server/Dockerfile   ★ ใหม่
 
   /api/                 ★ Go module (github.com/mac-checken/12tails-api) — ตาม PROJECT_TEMPLATE.md
-    main.go  docker-compose.yml (postgres)  Dockerfile  .env(.example)
+    main.go  Dockerfile   (docker-compose + .env ใช้ของ root)
     pkg/
       core/config.go                   # Config + PostgresConfig + DSN()  ✅ Phase 1
       db/db.go                         # GORM postgres + gormigrate       ✅ Phase 1

@@ -24,6 +24,9 @@ import (
 )
 
 func main() {
+	// Single root .env for the whole monorepo. Try the repo root first (when run
+	// from ./api), then a local .env; real env vars (e.g. in Docker) always win.
+	_ = godotenv.Load("../.env")
 	_ = godotenv.Load(".env")
 	viper.AutomaticEnv()
 	if loc, err := time.LoadLocation("Asia/Bangkok"); err == nil {

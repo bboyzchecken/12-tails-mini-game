@@ -1,0 +1,16 @@
+# Shared by the server/ and client/ image builds (context = repo root).
+**/node_modules
+**/dist
+.git
+.github
+.claude
+# Go API builds from its own ./api context, not needed here:
+api
+web
+# never ship env/secrets or local junk into the build context:
+**/.env
+**/.env.*
+!**/.env.example
+*.log
+.DS_Store
+scratchpad

@@ -41,7 +41,7 @@ func (p PostgresConfig) DSN() string {
 func Load() Config {
 	return Config{
 		Environment:  env("ENV", "development"),
-		Port:         env("PORT", "5000"),
+		Port:         port(),
 		ClientOrigin: env("CLIENT_ORIGIN", "*"),
 		JwtSecret:    env("JWT_SECRET_KEY", ""),
 		Postgres: PostgresConfig{
@@ -61,4 +61,13 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// port reads the shared root .env, where API_PORT is the service's port
+// (PORT is accepted as a fallback for standalone use).
+func port() string {
+	if p := viper.GetString("API_PORT"); p != "" {
+		return p
+	}
+	return env("PORT", "5000")
 }

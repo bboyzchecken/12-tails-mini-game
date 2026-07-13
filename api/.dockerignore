@@ -1,0 +1,10 @@
+# api image is built from ./api context — keep it lean and secret-free.
+.env
+.env.*
+!.env.example
+*.md
+.gitignore
+artifacts
+tmp
+*.log
+.DS_Store
