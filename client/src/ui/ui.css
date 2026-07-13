@@ -876,3 +876,187 @@ body.touch .chat-input-wrap input {
   .charselect .cs-inner { padding: 10px; gap: 10px; }
   .charselect .cs-title { font-size: 20px; }
 }
+
+/* ---- Entry gate: auth + character slots (Phase P) ---- */
+.authgate {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: auto;
+  background: radial-gradient(120% 120% at 50% 0%, #23233f 0%, #15152b 70%);
+  font-family: var(--font-body);
+}
+
+.auth-card {
+  width: min(380px, 94vw);
+  padding: 26px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+}
+.auth-title {
+  font-family: var(--font-head);
+  font-size: 22px;
+  color: var(--ui-ink);
+  margin: 0 0 2px;
+}
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+}
+.auth-tab {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--panel-line);
+  background: transparent;
+  border-radius: var(--radius-btn);
+  font-family: var(--font-head);
+  color: var(--ui-muted);
+  cursor: pointer;
+}
+.auth-tab.on {
+  background: var(--ui-accent);
+  color: #fff;
+  border-color: transparent;
+}
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.auth-form input {
+  padding: 11px 13px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-btn);
+  font-family: var(--font-body);
+  font-size: 15px;
+  background: #fff;
+  color: var(--ui-ink);
+  outline: none;
+}
+.auth-form input:focus {
+  border-color: var(--ui-accent);
+}
+.auth-err {
+  color: var(--ui-danger);
+  font-size: 13px;
+  min-height: 16px;
+}
+.auth-submit {
+  padding: 11px;
+  font-size: 15px;
+}
+.auth-guest {
+  width: 100%;
+}
+.auth-note {
+  font-size: 12px;
+  color: var(--ui-muted);
+  margin: 2px 0 0;
+  line-height: 1.5;
+}
+
+.slots-wrap {
+  width: min(720px, 96vw);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+.slots-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.slots-fam {
+  font-family: var(--font-head);
+  font-size: 17px;
+  color: #f3ecff;
+}
+.slots-fam b {
+  color: #ffcf9c;
+}
+.slots-title {
+  font-family: var(--font-head);
+  font-size: 24px;
+  color: #f3ecff;
+  margin: 0;
+}
+.slots-grid {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.slot-card {
+  width: 150px;
+  min-height: 190px;
+  padding: 14px;
+  border-radius: var(--radius-panel);
+  border: 2px solid var(--panel-line);
+  background: var(--panel);
+  color: var(--ui-ink);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-body);
+  transition: transform 0.1s, border-color 0.12s, background 0.12s;
+}
+.slot-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--ui-accent);
+}
+.slot-thumb {
+  width: 92px;
+  height: 92px;
+  object-fit: contain;
+}
+.slot-name {
+  font-family: var(--font-head);
+  font-size: 16px;
+}
+.slot-tribe {
+  font-size: 12px;
+  color: var(--ui-muted);
+}
+.slot-play {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #fff;
+  background: var(--ui-accent);
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+.slot-card.empty {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.04);
+  color: #cbc7dd;
+}
+.slot-card.empty:hover {
+  background: rgba(232, 148, 74, 0.1);
+}
+.slot-plus {
+  font-size: 40px;
+  line-height: 1;
+  color: var(--ui-accent);
+}
+.slot-add {
+  font-size: 14px;
+}
+
+/* back button when CharacterSelect runs in "create in a slot" mode */
+.cs-back {
+  align-self: flex-start;
+  color: #e8e2f5;
+  border-color: rgba(255, 255, 255, 0.25);
+}

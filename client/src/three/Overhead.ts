@@ -35,10 +35,10 @@ export class OverheadLayer {
     document.body.appendChild(this.root);
   }
 
-  ensure(id: string, name: string): Overhead {
+  ensure(id: string, name: string, familyName?: string): Overhead {
     let item = this.items.get(id);
     if (!item) {
-      item = new Overhead(name);
+      item = new Overhead(name, familyName);
       this.root.appendChild(item.el);
       this.items.set(id, item);
     }
@@ -76,7 +76,7 @@ class Overhead {
   private bubbleTimer: number | undefined;
   private emoteTimer: number | undefined;
 
-  constructor(name: string) {
+  constructor(name: string, familyName?: string) {
     this.el = document.createElement('div');
     this.el.style.cssText =
       'position:absolute;left:0;top:0;display:flex;flex-direction:column;' +
@@ -97,11 +97,26 @@ class Overhead {
       'white-space:pre-wrap;word-break:break-word;text-align:center;' +
       'box-shadow:0 2px 8px rgba(0,0,0,0.28);';
 
+    // Nameplate: family name (top, accent) over the character name (bottom).
+    // Guests have no family → a single centered line.
     const tag = document.createElement('div');
-    tag.textContent = name;
     tag.style.cssText =
-      'font-size:11px;color:#fff;background:rgba(0,0,0,0.4);padding:1px 6px;' +
-      'border-radius:6px;text-shadow:1px 1px 0 rgba(0,0,0,0.8);';
+      'display:flex;flex-direction:column;align-items:center;line-height:1.15;' +
+      'background:rgba(0,0,0,0.42);padding:2px 8px;border-radius:7px;' +
+      'text-shadow:1px 1px 0 rgba(0,0,0,0.8);';
+    if (familyName) {
+      const fam = document.createElement('div');
+      fam.textContent = familyName;
+      fam.style.cssText = 'font-size:9.5px;color:#ffcf9c;font-weight:600;letter-spacing:0.02em;';
+      const nm = document.createElement('div');
+      nm.textContent = name;
+      nm.style.cssText = 'font-size:11px;color:#fff;';
+      tag.append(fam, nm);
+    } else {
+      tag.textContent = name;
+      tag.style.fontSize = '11px';
+      tag.style.color = '#fff';
+    }
 
     this.el.append(this.emote, this.bubble, tag);
   }

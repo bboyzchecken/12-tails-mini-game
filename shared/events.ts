@@ -14,6 +14,7 @@ export interface PlayerState {
   id: string;          // socket id
   characterId: string; // key ใน characters.json
   name: string;
+  familyName?: string; // ชื่อ family ของบัญชี (บรรทัดบนของ nameplate); ว่าง = guest
   appearance: Appearance;
   x: number;
   y: number;
@@ -30,7 +31,7 @@ export interface ChatMessage {
 
 // Client -> Server
 export interface ClientToServerEvents {
-  'player:join': (p: { characterId: string; name: string; appearance: Appearance; x: number; y: number; dir: Direction }) => void;
+  'player:join': (p: { characterId: string; name: string; familyName?: string; appearance: Appearance; x: number; y: number; dir: Direction }) => void;
   'player:move': (p: { x: number; y: number; dir: Direction; moving: boolean }) => void;
   'chat:send':   (p: { text: string }) => void;
   'emote:send':  (p: { emoteId: string }) => void;

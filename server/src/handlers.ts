@@ -42,6 +42,14 @@ function safeName(name: unknown): string {
   );
 }
 
+/** Family name (nameplate top line). Empty stays empty (guests have none). */
+function safeFamily(name: unknown): string {
+  return String(name ?? '')
+    .replace(/[<>]/g, '')
+    .trim()
+    .slice(0, CONFIG.NAME_MAX_LEN);
+}
+
 /** Always sanitize chat on the server: strip HTML, collapse whitespace, cap length. */
 function sanitizeChat(raw: unknown): string {
   return String(raw ?? '')
@@ -61,6 +69,7 @@ export function registerHandlers(io: IO, socket: Sock) {
       id: socket.id,
       characterId: String(p.characterId ?? '').slice(0, 32),
       name: safeName(p.name),
+      familyName: safeFamily(p.familyName) || undefined,
       appearance: safeAppearance(p.appearance),
       x: safeNum(p.x, CONFIG.SPAWN.x),
       y: safeNum(p.y, CONFIG.SPAWN.y),

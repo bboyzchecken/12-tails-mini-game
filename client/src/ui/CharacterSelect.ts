@@ -9,6 +9,9 @@ interface CosmeticsIndex {
 
 interface CharacterSelectOptions {
   onEnter: (r: { characterId: string; name: string; appearance: Appearance }) => void;
+  title?: string;        // heading (default "เลือกตัวละคร")
+  confirmLabel?: string; // confirm button text (default "▶ เข้าเกม")
+  onBack?: () => void;   // when set, shows a back button (e.g. return to slots)
 }
 
 /**
@@ -26,12 +29,28 @@ export class CharacterSelect {
   private colorWrap!: HTMLDivElement;
   private faceWrap!: HTMLDivElement;
   private cardEls: HTMLButtonElement[] = [];
+  private destroyed = false;
 
   constructor(private opts: CharacterSelectOptions) {
     this.root = document.createElement('div');
     this.root.className = 'charselect';
     this.root.innerHTML = LAYOUT;
     document.body.appendChild(this.root);
+
+    if (opts.title) (this.root.querySelector('.cs-title') as HTMLElement).textContent = opts.title;
+    if (opts.confirmLabel) {
+      (this.root.querySelector('.cs-enter') as HTMLButtonElement).textContent = opts.confirmLabel;
+    }
+    if (opts.onBack) {
+      const back = document.createElement('button');
+      back.className = 'btn btn-ghost cs-back';
+      back.textContent = '← กลับ';
+      back.addEventListener('click', () => {
+        this.destroy();
+        opts.onBack!();
+      });
+      (this.root.querySelector('.cs-inner') as HTMLElement).prepend(back);
+    }
 
     const previewBox = this.root.querySelector('.cs-preview') as HTMLElement;
     this.preview = new CharacterPreview(previewBox);
@@ -144,6 +163,8 @@ export class CharacterSelect {
   }
 
   destroy() {
+    if (this.destroyed) return; // torn down from enter()/back/scene — guard double dispose
+    this.destroyed = true;
     this.preview.dispose();
     this.root.remove();
   }

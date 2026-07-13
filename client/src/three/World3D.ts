@@ -90,6 +90,7 @@ const MAP_OFFSET = new THREE.Vector3(0, -50, 0);
 export interface WorldInit {
   characterId: string;
   name: string;
+  familyName?: string; // account family name (nameplate top line); absent for guests
   appearance?: Appearance;
 }
 
@@ -430,7 +431,7 @@ export class World3D {
     this.player = new LocalPlayer3D(this.asset, CONFIG.SPAWN.x, CONFIG.SPAWN.y);
     void this.applyAppearance(this.player, this.selfDef.id, this.appearance);
     this.scene.add(this.player.group);
-    this.overheads.ensure('self', this.init.name);
+    this.overheads.ensure('self', this.init.name, this.init.familyName);
 
     // Start the camera snapped to the player.
     const p = this.player.group.position;
@@ -554,6 +555,7 @@ export class World3D {
       this.socket.emit('player:join', {
         characterId: this.init.characterId,
         name: this.init.name,
+        familyName: this.init.familyName,
         appearance: this.appearance,
         x: Math.round(this.player.posPx.x),
         y: Math.round(this.player.posPx.y),
@@ -630,7 +632,7 @@ export class World3D {
     void this.applyAppearance(r, def.id, state.appearance);
     this.remotes.set(state.id, r);
     this.scene.add(r.group);
-    this.overheads.ensure(state.id, state.name);
+    this.overheads.ensure(state.id, state.name, state.familyName);
     this.emitOnline();
   }
 
