@@ -362,7 +362,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(130% 130% at 50% -12%, #47c6da 0%, #1f8ea6 72%);
+  /* หน้าเลือก/สร้างตัวละคร ใช้อาร์ตเดียวกับ login · scrim เข้มขึ้นนิดให้โมเดล 3D + สวอทช์เด่น */
+  background:
+    linear-gradient(180deg, rgba(10, 22, 40, 0.42), rgba(10, 22, 40, 0.6)),
+    url('/assets/ui/login-bg.jpg?v=1') center / cover no-repeat;
+  background-color: #1f8ea6;
   font-family: var(--font-body);
   overflow: auto;
 }
@@ -890,11 +894,11 @@ body.touch .chat-input-wrap input {
   justify-content: center;
   padding: 20px;
   overflow: auto;
-  /* พื้นหลัง login = อาร์ตซัมเมอร์ 12 Tails · วางไฟล์ที่ client/public/assets/ui/login-bg.jpg
-     มี scrim มืดบางๆ ทับเพื่อให้การ์ด/ตัวอักษรอ่านชัด + teal fallback ถ้ายังไม่มีไฟล์ */
+  /* พื้นหลัง login = อาร์ตซัมเมอร์ 12 Tails (client/public/assets/ui/login-bg.jpg)
+     ?v= = cache-bust กัน browser จำคำตอบ fallback เดิม · scrim ให้การ์ดอ่านชัด · teal fallback */
   background:
     linear-gradient(180deg, rgba(10, 22, 40, 0.34), rgba(10, 22, 40, 0.52)),
-    url('/assets/ui/login-bg.jpg') center / cover no-repeat;
+    url('/assets/ui/login-bg.jpg?v=1') center / cover no-repeat;
   background-color: #1f8ea6;
   font-family: var(--font-body);
 }
