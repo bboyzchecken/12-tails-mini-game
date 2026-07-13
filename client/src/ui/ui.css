@@ -8,7 +8,8 @@
 :root {
   --panel: #fffaf3; /* ครีมนวลอุ่น (ฐานน่ารัก เข้ากับตัวละครชิบิ) */
   --panel-line: #ecdfce;
-  --panel-shadow: 0 6px 20px rgba(90, 70, 40, 0.14);
+  /* เงาเข้ม+ฟุ้ง ให้ panel เด่นลอยเหนือพื้นหลังรูป (ไม่จม) */
+  --panel-shadow: 0 12px 34px rgba(20, 14, 6, 0.34), 0 2px 8px rgba(20, 14, 6, 0.2);
   --ui-ink: #3f382f;
   --ui-muted: #97897a;
   --ui-accent: #1eb4cf; /* ฟ้า cyan จากโลโก้ — ปุ่มหลัก/โฟกัส ★ */
@@ -381,8 +382,9 @@
 .charselect .cs-title {
   font-family: var(--font-head);
   font-size: 26px;
-  color: #f3ecff;
+  color: #fff;
   margin: 0;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
 }
 .charselect .cs-strip {
   display: flex;
@@ -398,12 +400,15 @@
   cursor: pointer;
   border-radius: 12px;
   border: 2px solid transparent;
-  background: rgba(255, 255, 255, 0.05);
+  /* frosted so the strip reads over the artwork (not sunk) */
+  background: rgba(22, 28, 46, 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  color: #d8d8f0;
+  color: #f2f0fb;
   font-family: inherit;
   transition: border-color 0.12s, background 0.12s;
 }
@@ -417,7 +422,7 @@
 }
 .charselect .cs-card.on {
   border-color: var(--ui-accent);
-  background: rgba(232, 148, 74, 0.16);
+  background: rgba(30, 180, 207, 0.16); /* cyan tint (matches --ui-accent) */
 }
 .charselect .cs-main {
   display: flex;
@@ -482,10 +487,11 @@
 .charselect .cs-swatch.face {
   border-radius: 9px;
   background-color: #fff;
-  /* face art occupies the overlay's top-left quadrant — zoom in on it */
-  background-size: 195%;
-  background-position: 0 0;
   background-repeat: no-repeat;
+  /* Fallback while faceFrame.ts scans the image; it then centers each face on
+     its detected content box (face art sits at inconsistent spots per hero). */
+  background-size: contain;
+  background-position: center;
 }
 .charselect .cs-swatch.on {
   border: 2.5px solid var(--ui-accent);
@@ -831,6 +837,41 @@ body.touch .chat-input-wrap input {
 .side-btn.s1 { top: 52px; }
 .side-btn.s2 { top: 104px; }
 .side-btn.s3 { top: 156px; }
+.side-btn.s4 { top: 208px; }
+
+/* In-world menu popup (change character / logout) */
+.world-menu {
+  position: fixed;
+  top: 208px;
+  right: 64px;
+  z-index: 12;
+  width: 224px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+}
+.world-menu-item {
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-btn);
+  background: rgba(30, 180, 207, 0.07);
+  color: var(--ui-ink);
+  font-family: var(--font-head);
+  font-size: 14px;
+  transition: background 0.12s, transform 0.06s;
+}
+.world-menu-item:hover { background: rgba(30, 180, 207, 0.17); }
+.world-menu-item:active { transform: scale(0.98); }
+.world-menu-item.danger { color: var(--ui-danger); background: rgba(214, 69, 62, 0.07); }
+.world-menu-item.danger:hover { background: rgba(214, 69, 62, 0.15); }
 
 .side-panel {
   position: fixed;
@@ -857,6 +898,8 @@ body.touch .chat-input-wrap input {
   .side-btn.s1 { top: 88px; }
   .side-btn.s2 { top: 132px; }
   .side-btn.s3 { top: 176px; }
+  .side-btn.s4 { top: 220px; }
+  .world-menu { top: 220px; right: 56px; }
 
   .side-panel {
     top: 132px;
@@ -878,9 +921,19 @@ body.touch .chat-input-wrap input {
   .store-cell { width: 56px; height: 56px; }
   .store-foot { flex-wrap: wrap; }
 
-  /* charselect: tighter paddings on phones */
-  .charselect .cs-inner { padding: 10px; gap: 10px; }
+  /* charselect: tighter paddings on phones + stack preview above controls */
+  .charselect .cs-inner { padding: 10px; gap: 10px; width: 100%; }
   .charselect .cs-title { font-size: 20px; }
+  .charselect .cs-main { flex-direction: column; gap: 10px; }
+  .charselect .cs-preview { flex: 0 0 auto; width: 100%; height: 44vh; min-height: 220px; }
+  .charselect .cs-card { width: 66px; }
+  .charselect .cs-card img { width: 48px; height: 48px; }
+
+  /* auth + slots: comfortable on phones */
+  .auth-card { padding: 20px 16px; }
+  .slots-grid { gap: 10px; }
+  .slot-card { width: 44%; min-width: 130px; min-height: 160px; }
+  .world-menu { width: 180px; }
 }
 
 /* ---- Entry gate: auth + character slots (Phase P) ---- */
@@ -989,16 +1042,108 @@ body.touch .chat-input-wrap input {
 .slots-fam {
   font-family: var(--font-head);
   font-size: 17px;
-  color: #f3ecff;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
 }
 .slots-fam b {
   color: #ffcf9c;
 }
+.slots-actions {
+  display: flex;
+  gap: 8px;
+}
+/* Header buttons sit directly on the artwork — frost them so they don't sink. */
+.slots-actions .btn {
+  background: rgba(22, 28, 46, 0.44);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.32);
+}
+.slots-actions .btn:hover {
+  background: rgba(30, 180, 207, 0.35);
+}
+
+/* Member profile modal */
+.profile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(10, 18, 32, 0.55);
+}
+.profile-card {
+  position: relative;
+  width: min(360px, 92vw);
+  padding: 24px 22px 20px;
+  text-align: center;
+}
+.profile-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--ui-muted);
+  pointer-events: auto;
+}
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  background: var(--ui-accent);
+}
+.profile-fam {
+  font-family: var(--font-head);
+  font-size: 22px;
+  color: var(--ui-ink);
+  margin: 0;
+}
+.profile-role {
+  font-size: 13px;
+  color: var(--ui-muted);
+  margin-bottom: 14px;
+}
+.profile-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.profile-rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: rgba(30, 180, 207, 0.07);
+  font-size: 14px;
+}
+.profile-rows span {
+  color: var(--ui-muted);
+}
+.profile-rows b {
+  color: var(--ui-ink);
+  font-weight: 600;
+  word-break: break-word;
+  text-align: right;
+}
 .slots-title {
   font-family: var(--font-head);
   font-size: 24px;
-  color: #f3ecff;
+  color: #fff;
   margin: 0;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
 }
 .slots-grid {
   display: flex;
@@ -1050,11 +1195,16 @@ body.touch .chat-input-wrap input {
 }
 .slot-card.empty {
   border-style: dashed;
-  background: rgba(255, 255, 255, 0.04);
-  color: #cbc7dd;
+  border-color: rgba(255, 255, 255, 0.5);
+  /* frosted dark so the empty slot reads on the busy background (not sunk) */
+  background: rgba(22, 28, 46, 0.44);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  color: #eef0fb;
 }
 .slot-card.empty:hover {
-  background: rgba(232, 148, 74, 0.1);
+  background: rgba(30, 180, 207, 0.28);
+  border-color: var(--ui-accent);
 }
 .slot-plus {
   font-size: 40px;
@@ -1068,6 +1218,12 @@ body.touch .chat-input-wrap input {
 /* back button when CharacterSelect runs in "create in a slot" mode */
 .cs-back {
   align-self: flex-start;
-  color: #e8e2f5;
-  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(22, 28, 46, 0.44);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.cs-back:hover {
+  background: rgba(30, 180, 207, 0.35);
 }

@@ -5,6 +5,7 @@ import { CharacterSlots } from '../ui/CharacterSlots';
 import * as api from '../net/api';
 import type { MeResponse } from '../net/api';
 import type { WorldInit } from '../three/World3D';
+import { consumeEntryIntent } from '../boot';
 
 /**
  * Entry flow host (DOM overlays over a Phaser scene). Orchestrates the Phase P
@@ -23,7 +24,10 @@ export class CharacterSelectScene extends Phaser.Scene {
   create() {
     this.cameras.main.setBackgroundColor('#15152b');
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
-    void this.showGate();
+    // A guest hitting "change character" lands straight on the picker; everyone
+    // else goes through the gate (resume session → slots, or login).
+    if (consumeEntryIntent() === 'guest-create') this.showGuestCreate();
+    else void this.showGate();
   }
 
   /** Resume a saved session if the token is still valid, else show the auth gate. */
@@ -107,6 +111,8 @@ export class CharacterSelectScene extends Phaser.Scene {
   private showGuestCreate() {
     this.teardown();
     this.select = new CharacterSelect({
+      title: 'เล่นแบบ guest',
+      onBack: () => this.showAuth(), // guests can step back to the login screen
       onEnter: ({ characterId, name, appearance }) => this.launch({ characterId, name, appearance }),
     });
   }

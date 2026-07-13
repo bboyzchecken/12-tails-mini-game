@@ -1,4 +1,5 @@
 import { CHARACTERS } from '../manifest';
+import * as api from '../net/api';
 import type { Character, MeResponse } from '../net/api';
 
 interface CharacterSlotsOptions {
@@ -31,6 +32,13 @@ export class CharacterSlots {
     head.className = 'slots-head';
     head.innerHTML =
       `<div class="slots-fam">👪 <b>${escapeHtml(me.user.family_name)}</b></div>`;
+
+    const actions = document.createElement('div');
+    actions.className = 'slots-actions';
+    const profile = document.createElement('button');
+    profile.className = 'btn btn-ghost';
+    profile.textContent = '👤 โปรไฟล์';
+    profile.addEventListener('click', () => void this.showProfile());
     const logout = document.createElement('button');
     logout.className = 'btn btn-ghost slots-logout';
     logout.textContent = 'ออกจากระบบ';
@@ -38,7 +46,8 @@ export class CharacterSlots {
       this.destroy();
       this.opts.onLogout();
     });
-    head.appendChild(logout);
+    actions.append(profile, logout);
+    head.appendChild(actions);
 
     const title = document.createElement('h1');
     title.className = 'slots-title';
@@ -80,6 +89,49 @@ export class CharacterSlots {
       this.opts.onCreate(slot);
     });
     return card;
+  }
+
+  private async showProfile() {
+    const { user, characters, max_slots } = this.opts.me;
+    let since = '—';
+    try {
+      since = new Date(user.created_at).toLocaleDateString('th-TH', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch {
+      /* keep dash */
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'profile-overlay';
+    overlay.innerHTML =
+      `<div class="profile-card panel">` +
+      `<button class="profile-close" aria-label="ปิด">✕</button>` +
+      `<div class="profile-avatar">👤</div>` +
+      `<h2 class="profile-fam">${escapeHtml(user.family_name)}</h2>` +
+      `<div class="profile-role">${user.role === 'admin' ? 'แอดมิน' : 'สมาชิก'} · ${characters.length}/${max_slots} ตัวละคร</div>` +
+      `<div class="profile-rows">` +
+      `<div><span>อีเมล</span><b>${escapeHtml(user.email)}</b></div>` +
+      `<div><span>สมาชิกตั้งแต่</span><b>${since}</b></div>` +
+      `<div><span>เติมเงินสะสม (demo)</span><b class="profile-topup">…</b></div>` +
+      `</div></div>`;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    (overlay.querySelector('.profile-close') as HTMLButtonElement).addEventListener('click', close);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+
+    const topupEl = overlay.querySelector('.profile-topup') as HTMLElement;
+    try {
+      const t = await api.getTopups();
+      topupEl.textContent = `${t.total_jil.toLocaleString()} Jil`;
+    } catch {
+      topupEl.textContent = '—';
+    }
   }
 
   destroy() {

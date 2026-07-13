@@ -2,6 +2,7 @@ import { CONFIG } from '@12tails/shared/config';
 import type { Appearance } from '@12tails/shared/events';
 import { CHARACTERS } from '../manifest';
 import { CharacterPreview } from '../three/CharacterPreview';
+import { applyFaceFrame } from './faceFrame';
 
 interface CosmeticsIndex {
   [id: string]: { colors: number; faces: number };
@@ -134,6 +135,9 @@ export class CharacterSelect {
     const b = document.createElement('button');
     b.className = 'cs-swatch' + (lightBg ? ' face' : '') + (on ? ' on' : '');
     b.style.backgroundImage = `url(${url})`;
+    // Faces sit at inconsistent spots in the texture — center each one from its
+    // detected content box instead of a one-size crop.
+    if (lightBg) applyFaceFrame(b, url);
     b.addEventListener('click', pick);
     return b;
   }

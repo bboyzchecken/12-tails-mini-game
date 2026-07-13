@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CONFIG } from '@12tails/shared/config';
 import type { Appearance, PlayerState, ServerToClientEvents } from '@12tails/shared/events';
-import { connectSocket, type GameSocket } from '../net/socket';
+import { connectSocket, resetSocket, type GameSocket } from '../net/socket';
+import { bootEntry } from '../boot';
+import * as api from '../net/api';
 import { CHARACTERS, getCharacter, type CharacterDef } from '../manifest';
 import { gameToUI, uiToGame } from '../ui/bus';
 import { ChatOverlay } from '../ui/ChatOverlay';
@@ -148,6 +150,13 @@ export class World3D {
   private pinchDist = 0;
   private joystick?: VirtualJoystick;
   private sendAccum = 0;
+  // Teardown: one AbortController removes every window listener at once; DOM
+  // refs let dispose() clean up on return-to-menu (change character / logout).
+  private readonly ac = new AbortController();
+  private disposed = false;
+  private storeBtn?: HTMLButtonElement;
+  private menuBtn?: HTMLButtonElement;
+  private menu?: HTMLDivElement;
   private lastSent: SentState | null = null;
 
   // Day/night: lighting refs + one loaded group per map variant.
@@ -202,6 +211,7 @@ export class World3D {
       onOpenStore: () => this.openStore(control),
     });
     this.makeStoreButton(control);
+    this.makeMenuButton();
     this.renderer.setAnimationLoop(() => this.tick());
   }
 
@@ -222,7 +232,7 @@ export class World3D {
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+    }, { signal: this.ac.signal });
   }
 
   private setupWorld() {
@@ -465,9 +475,10 @@ export class World3D {
   // ---------------------------------------------------------------- input
 
   private setupInput() {
-    window.addEventListener('keydown', (e) => this.keys.add(e.code));
-    window.addEventListener('keyup', (e) => this.keys.delete(e.code));
-    window.addEventListener('blur', () => this.keys.clear());
+    const sig = { signal: this.ac.signal };
+    window.addEventListener('keydown', (e) => this.keys.add(e.code), sig);
+    window.addEventListener('keyup', (e) => this.keys.delete(e.code), sig);
+    window.addEventListener('blur', () => this.keys.clear(), sig);
 
     // Camera: 1 pointer drags to orbit, 2 pointers pinch to zoom (touch),
     // wheel zooms (mouse). Touches that start on a UI element (joystick,
@@ -528,7 +539,7 @@ export class World3D {
         `units=(${(px.x * PX_TO_UNIT).toFixed(1)}, ${(px.y * PX_TO_UNIT).toFixed(1)}) ` +
         `→ CONFIG.SPAWN = { x: ${Math.round(px.x)}, y: ${Math.round(px.y)} }`,
       );
-    });
+    }, { signal: this.ac.signal });
   }
 
   private readMoveInput() {
@@ -783,6 +794,94 @@ export class World3D {
     btn.className = 'side-btn s3';
     btn.addEventListener('click', () => this.openStore(control));
     document.body.appendChild(btn);
+    this.storeBtn = btn;
+  }
+
+  // ------------------------------------------------------------ world menu
+
+  /** ⚙️ button → popup with "change character" / "logout" (no page refresh). */
+  private makeMenuButton() {
+    const btn = document.createElement('button');
+    btn.title = 'เมนู';
+    btn.textContent = '⚙️';
+    btn.className = 'side-btn s4';
+
+    const menu = document.createElement('div');
+    menu.className = 'world-menu panel';
+    menu.style.display = 'none';
+    const mkItem = (label: string, onClick: () => void, danger = false) => {
+      const b = document.createElement('button');
+      b.className = 'world-menu-item' + (danger ? ' danger' : '');
+      b.textContent = label;
+      b.addEventListener('click', onClick);
+      return b;
+    };
+    const isGuest = !api.getToken();
+    menu.append(
+      mkItem('🔄 เปลี่ยนตัวละคร', () => this.returnToMenu(false)),
+      isGuest
+        ? mkItem('🔑 เข้าสู่ระบบ / สมัคร', () => this.returnToMenu(true))
+        : mkItem('🚪 ออกจากระบบ', () => this.returnToMenu(true), true),
+    );
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    });
+    // click anywhere else closes it
+    window.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (e.target !== btn && !menu.contains(e.target as Node)) menu.style.display = 'none';
+      },
+      { signal: this.ac.signal },
+    );
+
+    document.body.append(btn, menu);
+    this.menuBtn = btn;
+    this.menu = menu;
+  }
+
+  /** Leave the 3D world and go back to the entry flow without a page refresh. */
+  private returnToMenu(logout: boolean) {
+    const guest = !api.getToken();
+    if (logout) api.logout();
+    this.dispose();
+    // Logout/login → the gate (login). Change character → slots for accounts,
+    // or straight to the picker for guests (who have no slots to resume).
+    bootEntry(!logout && guest ? 'guest-create' : 'gate');
+  }
+
+  /** Tear down everything this world created so the entry flow can take over. */
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+
+    this.renderer.setAnimationLoop(null);
+    this.ac.abort(); // remove every window listener at once
+    resetSocket(); // leave the world (server drops us); next connect is fresh
+
+    const safe = (fn: () => void) => {
+      try {
+        fn();
+      } catch {
+        /* best-effort cleanup */
+      }
+    };
+    safe(() => this.overheads.destroy());
+    safe(() => this.chat.destroy());
+    safe(() => this.emotePanel.destroy());
+    safe(() => this.customize.destroy());
+    safe(() => this.dayNight.destroy());
+    safe(() => this.loading.destroy());
+    safe(() => this.joystick?.destroy());
+    this.storeBtn?.remove();
+    this.menuBtn?.remove();
+    this.menu?.remove();
+    document.body.classList.remove('touch');
+
+    safe(() => this.renderer.dispose());
+    this.renderer.domElement.remove();
   }
 
   // ------------------------------------------------------------- UI bridge

@@ -14,6 +14,7 @@ export interface Account {
   family_name: string;
   role: string;
   status: string;
+  created_at: string;
 }
 
 export interface Character {
@@ -97,6 +98,17 @@ export async function login(email: string, password: string): Promise<Account> {
 
 export function getMe(): Promise<MeResponse> {
   return request<MeResponse>('/me', {}, true);
+}
+
+export interface TopUp {
+  id: string;
+  amount_jil: number;
+  note?: string;
+  created_at: string;
+}
+
+export function getTopups(): Promise<{ topups: TopUp[]; total_jil: number }> {
+  return request<{ topups: TopUp[]; total_jil: number }>('/me/topups', {}, true);
 }
 
 export async function createCharacter(input: {

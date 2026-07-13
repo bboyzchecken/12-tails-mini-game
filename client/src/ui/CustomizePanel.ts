@@ -3,6 +3,7 @@ import type { AppearanceControl } from './appearanceControl';
 import { getHeroEquipment } from './equipmentIndex';
 import { getEquipThumb } from './EquipThumbs';
 import { demoStore, type CosmeticType } from './store/demoState';
+import { applyFaceFrame } from './faceFrame';
 
 const SWATCH = 40;
 
@@ -112,10 +113,15 @@ export class CustomizePanel {
       const owned = demoStore.isOwned(hero, type, n);
       const b = this.cell(n === selected);
       b.style.borderRadius = type === 'color' ? '50%' : '9px';
-      // face art lives in the overlay's top-left quadrant — zoom in on it
-      b.style.background = type === 'face'
-        ? `#fff url(assets/cosmetics/${hero}/${type}/${n}.png) 0 0/195% no-repeat`
-        : `transparent url(assets/cosmetics/${hero}/${type}/${n}.png) center/cover no-repeat`;
+      const url = `assets/cosmetics/${hero}/${type}/${n}.png`;
+      if (type === 'face') {
+        // Faces sit at inconsistent spots in the texture — center each from its
+        // detected content box (see faceFrame.ts).
+        b.style.background = `#fff url(${url}) center/contain no-repeat`;
+        applyFaceFrame(b, url);
+      } else {
+        b.style.background = `transparent url(${url}) center/cover no-repeat`;
+      }
       if (!owned) this.lock(b);
       b.addEventListener('click', () => {
         if (owned) this.commit({ [type]: n });
@@ -162,8 +168,9 @@ export class CustomizePanel {
       const buy = document.createElement('button');
       buy.textContent = '🛒 ซื้อในร้าน';
       buy.style.cssText =
-        'font-size:11px;padding:0 8px;height:40px;border-radius:9px;cursor:pointer;' +
-        'border:1px dashed var(--panel-line,#ECD9C2);background:transparent;color:#9a8574;';
+        `grid-column:span 4;white-space:nowrap;font-size:12px;padding:0 10px;height:${SWATCH}px;` +
+        'border-radius:9px;cursor:pointer;border:1px dashed var(--panel-line,#ecdfce);' +
+        'background:transparent;color:var(--ui-muted,#97897a);';
       buy.addEventListener('click', () => this.opts.onOpenStore());
       g.appendChild(buy);
     }

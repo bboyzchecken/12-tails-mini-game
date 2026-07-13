@@ -22,3 +22,16 @@ export function connectSocket(): GameSocket {
 export function getSocket(): GameSocket | null {
   return socket;
 }
+
+/**
+ * Fully drop the connection (leaving the world so the server removes us) and
+ * clear the cached instance — the next connectSocket() makes a fresh one. Used
+ * when returning from the 3D world to the menu.
+ */
+export function resetSocket() {
+  if (socket) {
+    socket.removeAllListeners();
+    socket.disconnect();
+    socket = null;
+  }
+}
