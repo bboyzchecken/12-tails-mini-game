@@ -16,7 +16,10 @@ import (
 	"github.com/mac-checken/12tails-api/pkg/db"
 	"github.com/mac-checken/12tails-api/pkg/handlers/api"
 	"github.com/mac-checken/12tails-api/pkg/logger"
+	characterstore "github.com/mac-checken/12tails-api/pkg/store/character"
 	eventstore "github.com/mac-checken/12tails-api/pkg/store/event"
+	topupstore "github.com/mac-checken/12tails-api/pkg/store/topup"
+	userstore "github.com/mac-checken/12tails-api/pkg/store/user"
 	waitliststore "github.com/mac-checken/12tails-api/pkg/store/waitlist"
 )
 
@@ -46,6 +49,9 @@ func main() {
 			db.New,
 			eventstore.New,
 			waitliststore.New,
+			userstore.New,
+			characterstore.New,
+			topupstore.New,
 			api.NewServer,
 		),
 		fx.Invoke(registerServer),

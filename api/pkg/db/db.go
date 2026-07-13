@@ -39,6 +39,20 @@ func migrate(gdb *gorm.DB) error {
 				return tx.Migrator().DropTable("events", "waitlists")
 			},
 		},
+		{
+			ID: "20260713_phase_p_accounts",
+			Migrate: func(tx *gorm.DB) error {
+				return tx.AutoMigrate(
+					&models.User{},
+					&models.Character{},
+					&models.AuthProvider{},
+					&models.TopUp{},
+				)
+			},
+			Rollback: func(tx *gorm.DB) error {
+				return tx.Migrator().DropTable("auth_providers", "top_ups", "characters", "users")
+			},
+		},
 	})
 	return m.Migrate()
 }

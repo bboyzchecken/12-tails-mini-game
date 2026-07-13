@@ -170,19 +170,21 @@
 - **AC:** ✅ `curl POST /track` → row ใน Postgres, field ครบ · buy_intent ดึง price/type จาก jsonb ได้ · `/waitlist` กันซ้ำ
 - 🔜 ต่อยอด: aggregate methods ใน EventStore (ไว้ทำ dashboard Phase 4)
 
-### Phase P — บัญชีผู้เล่น + โปรไฟล์เกม  `(ใหม่ · ทำหลัง Phase 1, ก่อนฟีเจอร์ persistent)`
+### Phase P — บัญชีผู้เล่น + โปรไฟล์เกม  `(ใหม่ · ทำหลัง Phase 1)` 🟡 backend เสร็จ · game-side ต่อ
 > เดิม Phase 3 = landing/frontend เท่านั้น **ไม่รวม**บัญชีผู้เล่น — นี่คือส่วนที่เพิ่ม
 > ปัจจุบัน `CharacterSelect` ให้พิมพ์ "ชื่อเล่น" → `player:join` แบบ ephemeral · ไม่มีบัญชี/ownership/ประวัติ
 > **ทำไมจำเป็น:** ไม่มีบัญชี = ไม่มีประวัติเติมเงิน, ไม่รู้ใครเติม, นับ "คนจริง" (registered) ไม่ได้. บัญชีปลดล็อก registered/MAU, top-up attribution, identity ถาวรของ character/fishing inventory, และผูก `buy_intent` กับ "ใคร"
 > **บันไดยืนยันตัวตน (progressive · ✅ เคาะแล้ว):** guest (session) → **สมัคร standalone** (email/username+password · ไม่ต้องผูก social · OTP ออปชัน) → **ผูก Google / Apple / Line** ทีหลัง (optional — กู้บัญชี/ล็อกอินข้ามเครื่อง). Line สำคัญสำหรับคอมมูไทย
 
-- [ ] **Go (ต่อยอด `User` ของเทมเพลตที่มี auth อยู่แล้ว):** เพิ่ม `family_name` (unique, ถาวร เช่น "CHXQ") + domain `Character{ user_id, name(ถาวร), character_id/tribe, appearance(JSON), slot_index, created_at }` (หลายตัว/บัญชี) + `AuthProvider{ user_id, provider(google|apple|line), provider_user_id, linked_at }` (ผูก social ทีหลัง — 1 บัญชีผูกได้หลาย provider)
-- [ ] **Go endpoints:** `POST /auth/register` (email/username+password — standalone, OTP ออปชัน), `POST /auth/login`→JWT (เทมเพลตมี) · `POST /auth/link/:provider` + `/auth/:provider/callback` (OAuth Google/Apple/Line — เฟสหลัง) · `GET/POST /me/characters` · `PATCH /me/family-name` · (demo) `POST /me/topup` เก็บ**ประวัติเติมเงิน**
+- [x] **Go models** ✅ — `User`(+`family_name` unique ถาวร) · `Character{user_id,name,character_id,appearance jsonb,slot_index}` (unique ต่อ slot) · `AuthProvider` (schema พร้อมสำหรับ social) · `TopUp` (demo history)
+- [x] **Go endpoints** ✅ — `POST /auth/register` (standalone, bcrypt), `POST /auth/login`→JWT (HS256, 7 วัน) · `GET /me` · `GET/POST /me/characters` (slot limit 3) · `POST /me/topup` + `GET /me/topups` · `JwtMiddleware`+`IsAdmin` · 🔜 เฟสหลัง: OAuth `/auth/link/:provider` (Google/Apple/Line), name-change ด้วย Jil
+- ℹ️ **ไม่ทำ** `PATCH /me/family-name` แบบฟรี — เพราะชื่อ**ถาวร** (เปลี่ยน = ไอเทม Jil ทีหลัง)
 - [ ] **แสดง 2 บรรทัด:** family_name (บรรทัด 1) + character.name (บรรทัด 2) — แก้ `player:join` payload + nameplate `Overhead.ts` + `ChatBubble`
 - [ ] **game-side (client):** หน้าจอ register/login ก่อนเข้าเกม · `CharacterSelect` → **character-slot picker** (เลือก/สร้างในช่องว่าง/สลับตัว) · เก็บ JWT แนบทุก request ที่ต้อง persist
 - [ ] ชื่อ **ถาวร** — เปลี่ยนได้เฉพาะผ่านไอเทม Jil (`name_change`) · slot เพิ่มด้วย Jil (`char_slot`) → ยิง `buy_intent`
 - [ ] **guest gate (แนะนำ):** guest เดิน/คุยได้ด้วยชื่อชั่วคราว (นับเป็น session) · บังคับ register เมื่อจะจองชื่อถาวร/เก็บตัวละคร/เติมเงิน/เก็บ inventory ตกปลา — รักษา funnel "เข้ามาลองก่อน"
-- **AC:** สมัคร→ได้ family_name ถาวร + สร้าง character · ชื่อตัวไม่เปลี่ยนเอง (ต้องใช้ item) · แชทโชว์ 2 บรรทัด · logged-in ยิง event ผูก `account_id` · admin เห็นจำนวน registered users + ประวัติเติมเงิน(demo)
+- **AC (backend ✅ verify แล้ว):** สมัคร→ได้ family_name ถาวร + สร้าง character (slot 0-2, ตัวที่ 4 = 409) · dup family = 409 · password เก็บเป็น bcrypt · JWT กัน `/me/*` · topup history รวมยอดถูก · nameplate = family/name (CHXQ / หมาป่าเดียวดาย)
+- 🔜 **เหลือ game-side:** register/login UI ก่อนเข้าเกม · `CharacterSelect` → character-slot picker · nameplate 2 บรรทัด (`Overhead.ts`/`ChatBubble`) + `player:join` payload · แนบ JWT + `account_id` ในทุก event (คู่กับ Phase 2)
 
 ### Phase 2 — เชื่อมเกม → API ⭐  `(= L2 ส่วนเกม)`
 > จุดเชื่อมสำคัญสุด: ทำให้เกมที่ deploy แล้วเริ่มส่งสัญญาณดีมานด์

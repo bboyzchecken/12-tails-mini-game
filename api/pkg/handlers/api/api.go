@@ -18,17 +18,32 @@ import (
 // Server holds the Echo instance and its injected dependencies (one field per
 // store, mirroring the team's Go template).
 type Server struct {
-	Config        core.Config
-	Log           *logrus.Logger
-	EventStore    models.EventStore
-	WaitlistStore models.WaitlistStore
+	Config         core.Config
+	Log            *logrus.Logger
+	EventStore     models.EventStore
+	WaitlistStore  models.WaitlistStore
+	UserStore      models.UserStore
+	CharacterStore models.CharacterStore
+	TopUpStore     models.TopUpStore
 
 	echo *echo.Echo
 }
 
 // NewServer wires dependencies and builds the Echo router. Injected by Uber FX.
-func NewServer(cfg core.Config, log *logrus.Logger, es models.EventStore, ws models.WaitlistStore) *Server {
-	s := &Server{Config: cfg, Log: log, EventStore: es, WaitlistStore: ws}
+func NewServer(
+	cfg core.Config,
+	log *logrus.Logger,
+	es models.EventStore,
+	ws models.WaitlistStore,
+	us models.UserStore,
+	cs models.CharacterStore,
+	ts models.TopUpStore,
+) *Server {
+	s := &Server{
+		Config: cfg, Log: log,
+		EventStore: es, WaitlistStore: ws,
+		UserStore: us, CharacterStore: cs, TopUpStore: ts,
+	}
 	s.echo = s.build()
 	return s
 }
@@ -53,6 +68,18 @@ func (s *Server) build() *echo.Echo {
 	e.POST("/track", s.Track)
 	e.POST("/waitlist", s.Waitlist)
 
+	// Public auth (standalone register + login). Social linking comes later.
+	e.POST("/auth/register", s.Register)
+	e.POST("/auth/login", s.Login)
+
+	// Protected account routes (Bearer JWT).
+	me := e.Group("/me", s.JwtMiddleware())
+	me.GET("", s.GetMe)
+	me.GET("/characters", s.ListCharacters)
+	me.POST("/characters", s.CreateCharacter)
+	me.POST("/topup", s.TopUp)
+	me.GET("/topups", s.ListTopups)
+
 	return e
 }
 
@@ -69,7 +96,7 @@ func (s *Server) cors() echo.MiddlewareFunc {
 	return middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: origins,
 		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
-		AllowHeaders: []string{echo.HeaderContentType, echo.HeaderAccept, "X-Session-Id"},
+		AllowHeaders: []string{echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization, "X-Session-Id"},
 	})
 }
 
