@@ -1,17 +1,19 @@
 /*
  * UI design tokens + base primitives (12tails-ui-roadmap.md §4)
- * ทิศทาง: อบอุ่น กลมมน น่ารัก — panel ครีมอุ่น ปุ่มส้มอุ่น/มิ้นต์
+ * ทิศทาง: อิงจาก "โลโก้ + ตัวละคร" ของ 12 Tails Online — สดใส กลมมน น่ารัก
+ * (พื้นหลังมืดในภาพโปรโมทเป็นงานทีม ไม่ใช่แบรนด์ — ไม่นำมาใช้)
+ * accent หลัก = ฟ้า cyan เรืองแสงจากโลโก้ · secondary = ส้มคอรัลจากตัวละคร
  * กติกา: UI ทุกชิ้น reuse .panel / .btn และ var() เท่านั้น ห้าม hardcode สี
  */
 :root {
-  --panel: #fff9f0;
-  --panel-line: #ecd9c2;
-  --panel-shadow: 0 6px 20px rgba(120, 80, 40, 0.12);
-  --ui-ink: #4a3b2e;
-  --ui-muted: #9a8574;
-  --ui-accent: #e8944a; /* ส้มอุ่น (ปุ่มหลัก) */
-  --ui-accent-2: #6fb0a6; /* เขียวมิ้นต์ (secondary) */
-  --ui-danger: #c62f2f; /* ใช้กับ DEMO banner / คำเตือน */
+  --panel: #fffaf3; /* ครีมนวลอุ่น (ฐานน่ารัก เข้ากับตัวละครชิบิ) */
+  --panel-line: #ecdfce;
+  --panel-shadow: 0 6px 20px rgba(90, 70, 40, 0.14);
+  --ui-ink: #3f382f;
+  --ui-muted: #97897a;
+  --ui-accent: #1eb4cf; /* ฟ้า cyan จากโลโก้ — ปุ่มหลัก/โฟกัส ★ */
+  --ui-accent-2: #f2894a; /* ส้มคอรัลจากตัวละคร — secondary ★ */
+  --ui-danger: #d6453e;
   --radius-panel: 16px;
   --radius-btn: 12px;
   --font-head: 'Mitr', 'Leelawadee UI', sans-serif;
@@ -360,7 +362,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(120% 120% at 50% 0%, #23233f 0%, #15152b 70%);
+  background: radial-gradient(130% 130% at 50% -12%, #47c6da 0%, #1f8ea6 72%);
   font-family: var(--font-body);
   overflow: auto;
 }
@@ -888,7 +890,12 @@ body.touch .chat-input-wrap input {
   justify-content: center;
   padding: 20px;
   overflow: auto;
-  background: radial-gradient(120% 120% at 50% 0%, #23233f 0%, #15152b 70%);
+  /* พื้นหลัง login = อาร์ตซัมเมอร์ 12 Tails · วางไฟล์ที่ client/public/assets/ui/login-bg.jpg
+     มี scrim มืดบางๆ ทับเพื่อให้การ์ด/ตัวอักษรอ่านชัด + teal fallback ถ้ายังไม่มีไฟล์ */
+  background:
+    linear-gradient(180deg, rgba(10, 22, 40, 0.34), rgba(10, 22, 40, 0.52)),
+    url('/assets/ui/login-bg.jpg') center / cover no-repeat;
+  background-color: #1f8ea6;
   font-family: var(--font-body);
 }
 
