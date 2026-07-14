@@ -13,6 +13,8 @@ export interface GameToUI {
   'system:message': { text: string }; // "X เข้ามา"
   'profile:show': { id: string; name: string; level: number; characterId: string; cosmetics: string[] };
   'room:name': { name: string };
+  /** โลกแจ้งตัวเลขแจ้งเตือนบนไอคอนเมนู (0 = ซ่อน) — id ตาม panelRegistry */
+  'menu:badge': { id: string; count: number };
 }
 
 // UI -> game
@@ -22,6 +24,9 @@ export interface UIToGame {
   'cosmetic:equip': { type: 'skin' | 'color' | 'emote' | 'chatFrame'; id: string }; // demo
   'music:toggle': Record<string, never>;
   'store:open': { tab: string };
+  /** PanelManager แจ้งการเปิด/ปิด panel (id ตาม panelRegistry) — โลกใช้ pause/สถิติได้ */
+  'panel:open': { id: string };
+  'panel:close': { id: string };
 }
 
 type Handler<P> = (payload: P) => void;

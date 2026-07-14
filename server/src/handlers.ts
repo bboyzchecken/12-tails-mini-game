@@ -71,6 +71,8 @@ function sanitizeChat(raw: unknown): string {
 const lastEmoteAt = new Map<string, number>();
 /** Last fishing-cast timestamp per socket — throttles the authoritative roll. */
 const lastCastAt = new Map<string, number>();
+/** Suspense timer of the round in flight per socket (server owns round timing). */
+const pendingCast = new Map<string, NodeJS.Timeout>();
 
 export function registerHandlers(io: IO, socket: Sock) {
   socket.on('player:join', (p) => {
@@ -138,23 +140,43 @@ export function registerHandlers(io: IO, socket: Sock) {
   socket.on('fishing:cast', (p) => {
     const player = world.get(socket.id);
     if (!player) return; // must join before fishing
+    if (pendingCast.has(socket.id)) return; // รอบก่อนยังไม่เฉลย — ห้ามซ้อน
     const now = Date.now();
     const last = lastCastAt.get(socket.id) ?? 0;
     if (now - last < CONFIG.FISHING.MIN_CAST_INTERVAL_MS) return; // spam guard
     const spotId = String(p?.spotId ?? '').slice(0, 32);
-    const result = rollFishing(spotId); // server ตัดสินผล (สุ่มปลา + ติด/หลุด)
+    const result = rollFishing(spotId); // server ตัดสินผลทันที (สุ่มปลา + ติด/หลุด)
     if (!result) return; // spotId ไม่รู้จัก
     lastCastAt.set(socket.id, now);
-    socket.emit('fishing:result', result); // ส่งกลับเฉพาะคนตก
-    // ประกาศ epic/legendary กลางแชท (hype — spec §9)
-    if (shouldAnnounce(result)) {
-      io.emit('fishing:announce', { name: player.name, fishId: result.fishId, tier: result.tier });
-    }
+
+    // SERVER เป็นเจ้าของจังหวะรอบ: บอกทุกคนว่า "เริ่มตก" (นั่ง + บอลลูน 🎣) แล้ว
+    // หน่วงช่วงลุ้นก่อนเฉลยพร้อมกันทุก client — ผลถูก roll ไว้แล้ว แค่ยังไม่บอก
+    io.emit('fishing:started', { id: socket.id });
+    const F = CONFIG.FISHING;
+    const suspense = F.CAST_MS + F.WAIT_MIN_MS + Math.random() * (F.WAIT_MAX_MS - F.WAIT_MIN_MS);
+    const timer = setTimeout(() => {
+      pendingCast.delete(socket.id);
+      if (!world.get(socket.id)) return; // หลุดออกไประหว่างรอ — เงียบ
+      socket.emit('fishing:result', result); // รายละเอียดเต็มเฉพาะคนตก (%จับ/ราคา)
+      io.emit('fishing:resolved', {
+        id: socket.id, fishId: result.fishId, tier: result.tier, caught: result.caught,
+      });
+      // ประกาศ epic/legendary กลางแชท (hype — spec §9)
+      if (shouldAnnounce(result)) {
+        io.emit('fishing:announce', { name: player.name, fishId: result.fishId, tier: result.tier });
+      }
+    }, suspense);
+    pendingCast.set(socket.id, timer);
   });
 
   socket.on('disconnect', () => {
     lastEmoteAt.delete(socket.id);
     lastCastAt.delete(socket.id);
+    const pending = pendingCast.get(socket.id);
+    if (pending) {
+      clearTimeout(pending); // คนตกหลุดไป — remotes เคลียร์บอลลูนตอน player:left อยู่แล้ว
+      pendingCast.delete(socket.id);
+    }
     if (world.remove(socket.id)) {
       socket.broadcast.emit('player:left', { id: socket.id });
       console.log(`[server] left: ${socket.id} · ${world.count} online`);

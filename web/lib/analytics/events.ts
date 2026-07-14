@@ -28,6 +28,7 @@ export type EventType =
   | 'play_start'
   | 'shop_open'
   | 'buy_intent'
+  | 'panel_open' // menu panel opened; meta {id, status} — status 'planned' = demand signal
   // landing-only
   | 'page_view'
   | 'cta_click'

@@ -14,6 +14,8 @@ interface CosmeticsIndex {
 interface CustomizePanelOptions {
   control: AppearanceControl;
   onOpenStore: () => void;
+  /** แจ้งเมื่อ panel ปิดตัวเอง (คลิกนอก) — ใช้เคลียร์ state ใน PanelManager */
+  onClose?: () => void;
 }
 
 function pretty(name: string): string {
@@ -24,19 +26,19 @@ function pretty(name: string): string {
  * Live equip panel (DOM overlay): swap between the colors/faces/weapons/hats
  * you OWN. Locked items show 🔒 and open the store. Equipping commits +
  * broadcasts through the appearance control so everyone sees it.
+ * เปิด/ปิดผ่าน MenuHub (panelRegistry id: 'customize') — ไม่มีปุ่มลอยของตัวเองแล้ว
  */
 export class CustomizePanel {
   private root: HTMLDivElement;
-  private button: HTMLButtonElement;
   private panel: HTMLDivElement;
-  private open = false;
+  private isOpen = false;
   private counts = { colors: 1, faces: 1 };
   private equip: Record<'weapon' | 'hat', string[]> = { weapon: [], hat: [] };
   private outfits: string[] = [];
   private unsub: () => void;
 
   private readonly onDocPointerDown = (e: PointerEvent) => {
-    if (this.open && !this.root.contains(e.target as Node)) this.close();
+    if (this.isOpen && !this.root.contains(e.target as Node)) this.close();
   };
 
   constructor(private opts: CustomizePanelOptions) {
@@ -45,19 +47,13 @@ export class CustomizePanel {
       'position:fixed;inset:0;pointer-events:none;z-index:11;' +
       'font-family:Tahoma,"Leelawadee UI",sans-serif;';
 
-    this.button = document.createElement('button');
-    this.button.title = 'แต่งตัว';
-    this.button.textContent = '🎨';
-    this.button.className = 'side-btn s2';
-    this.button.addEventListener('click', () => (this.open ? this.close() : this.show()));
-
     this.panel = document.createElement('div');
     this.panel.className = 'panel side-panel';
 
-    this.root.append(this.panel, this.button);
+    this.root.append(this.panel);
     document.body.appendChild(this.root);
     document.addEventListener('pointerdown', this.onDocPointerDown, true);
-    this.unsub = demoStore.subscribe(() => { if (this.open) this.render(); });
+    this.unsub = demoStore.subscribe(() => { if (this.isOpen) this.render(); });
 
     void this.loadData();
   }
@@ -72,7 +68,7 @@ export class CustomizePanel {
     }
     this.equip = await getHeroEquipment(this.opts.control.characterId);
     this.outfits = await getHeroCostumes(this.opts.control.characterId);
-    if (this.open) this.render();
+    if (this.isOpen) this.render();
   }
 
   private commit(patch: Partial<Appearance>) {
@@ -255,15 +251,17 @@ export class CustomizePanel {
     this.commit({ color: pick(colors), face: pick(faces) });
   }
 
-  private show() {
-    this.open = true;
+  show() {
+    this.isOpen = true;
     this.render();
     this.panel.style.display = 'block';
   }
 
-  private close() {
-    this.open = false;
+  close() {
+    if (!this.isOpen) return;
+    this.isOpen = false;
     this.panel.style.display = 'none';
+    this.opts.onClose?.();
   }
 
   destroy() {

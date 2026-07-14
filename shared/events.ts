@@ -65,6 +65,8 @@ export interface ServerToClientEvents {
   'chat:message':   (m: ChatMessage) => void;
   'emote:played':   (p: { id: string; emoteId: string }) => void;
   'appearance:changed': (p: { id: string; appearance: Appearance }) => void;
-  'fishing:result': (r: FishingResult) => void;                                  // ส่งกลับเฉพาะคนตก
+  'fishing:started': (p: { id: string }) => void;                                // มีคนเริ่มตกปลา — ทุกคนเห็น (นั่ง + บอลลูน 🎣 เหนือหัว)
+  'fishing:resolved': (p: { id: string; fishId: string; tier: FishTier; caught: boolean }) => void; // จบรอบ — ทุกคนเห็นผล (บอลลูนปลา/หลุด แทนที่ 🎣)
+  'fishing:result': (r: FishingResult) => void;                                  // ส่งกลับเฉพาะคนตก (รายละเอียดเต็ม: %จับ/ราคา)
   'fishing:announce': (p: { name: string; fishId: string; tier: FishTier }) => void; // ประกาศ epic/legendary ให้ทุกคน (hype กลางแชท)
 }

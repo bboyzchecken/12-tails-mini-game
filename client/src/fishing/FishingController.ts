@@ -33,9 +33,6 @@ export class FishingController {
   private phase: Phase = 'idle';
   private nearby: Spot | null = null;
   private timers: number[] = [];
-  /** ผลจาก server ที่มาถึงระหว่างเล่นอนิเมชัน suspense (buffer ไว้ค่อย reveal) */
-  private serverResult: FishingResult | null = null;
-  private awaitingReveal = false;
   private bagOpen = false;
   private offStore: () => void;
 
@@ -91,47 +88,32 @@ export class FishingController {
   }
 
   // ------------------------------------------------------ minigame flow
+  // จังหวะรอบเป็นของ SERVER (broadcast started → หน่วงลุ้น → resolved พร้อมกันทุกคน)
+  // ระหว่างลุ้น ภาพหลักคือบอลลูน 🎣 เหนือหัว (Overhead — ทุกคนเห็น) ที่นี่เหลือแค่
+  // เสียงฝั่งคนตก + การ์ดเฉลยรายละเอียดเต็มตอนผลมาถึง
 
   private tryCast() {
     if (this.phase !== 'idle' || !this.nearby || !this.opts.canInteract()) return;
     const spot = this.nearby;
     this.phase = 'casting';
-    this.serverResult = null;
-    this.awaitingReveal = false;
     this.refreshPrompt();
 
-    this.opts.onCast(spot.id); // → server สุ่มผล แล้วตอบกลับ fishing:result
+    this.opts.onCast(spot.id); // → server broadcast started + ตั้งเวลาเฉลย
     audio.play('fishing.cast');
+    this.after(F.CAST_MS, () => audio.play('fishing.splash')); // เสียงเบ็ดตกน้ำ ตาม CAST window ของ server
 
-    // อนิเมชัน suspense (แค่ presentation — ผลจริงมาจาก server)
-    this.showStage('เหวี่ยงเบ็ด~', '', '<div class="fishing-bobber">🎣</div>');
-    this.after(F.CAST_MS, () => {
-      audio.play('fishing.splash');
-      this.showStage('รอปลากิน…', 'จับตาดูทุ่น', '<div class="fishing-bobber">🎣</div>');
-      const wait = F.WAIT_MIN_MS + Math.random() * (F.WAIT_MAX_MS - F.WAIT_MIN_MS);
-      this.after(wait, () => this.onBite());
-    });
+    // safety: ผลไม่มาสักที (server รีสตาร์ท/หลุด) — คืนสถานะเงียบๆ
+    this.after(F.CAST_MS + F.WAIT_MAX_MS + 4000, () => this.endRound());
   }
 
-  private onBite() {
-    audio.play('fishing.bite');
-    this.showStage('❗ ปลากินเบ็ด!', 'กำลังสู้ปลา…', '<div class="fishing-bobber bite">🎣</div>');
-    // ให้จังหวะ "ตื่นเต้น" สั้นๆ ก่อนเฉลย
-    this.after(650, () => {
-      if (this.serverResult) this.reveal(this.serverResult);
-      else this.awaitingReveal = true; // ผล server ยังไม่มา — reveal ทันทีที่มาถึง
-    });
-  }
-
-  /** World3D ส่งต่อ fishing:result จาก socket มาที่นี่ */
+  /** World3D ส่งต่อ fishing:result จาก socket มาที่นี่ (จังหวะเฉลยของ server) */
   showResult(r: FishingResult) {
-    // ไม่ได้อยู่ในรอบ cast (เช่นมาช้าหลังปิด) — ทิ้ง
-    if (this.phase === 'idle') return;
-    this.serverResult = r;
-    if (this.awaitingReveal) {
-      this.awaitingReveal = false;
-      this.reveal(r);
-    }
+    if (this.phase !== 'casting') return; // ไม่ได้อยู่ในรอบ — ทิ้ง
+    this.clearTimers(); // ปลด safety timeout
+    this.phase = 'reveal';
+    // จังหวะ "ปลากิน!" สั้นๆ ก่อนเปิดการ์ด — เสียง bite แล้วค่อยเฉลย
+    audio.play('fishing.bite');
+    this.after(500, () => this.reveal(r));
   }
 
   private reveal(r: FishingResult) {
@@ -175,19 +157,8 @@ export class FishingController {
     this.clearTimers();
     this.stage.classList.remove('show');
     this.stage.innerHTML = '';
-    this.serverResult = null;
-    this.awaitingReveal = false;
     this.phase = 'idle';
     this.refreshPrompt();
-  }
-
-  private showStage(msg: string, sub: string, extraHtml = '') {
-    this.stage.style.removeProperty('--tier');
-    this.stage.innerHTML =
-      extraHtml +
-      `<div class="stage-msg">${msg}</div>` +
-      (sub ? `<div class="stage-sub">${sub}</div>` : '');
-    this.stage.classList.add('show');
   }
 
   private spriteHtml(fishId: string): string {

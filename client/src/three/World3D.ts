@@ -15,6 +15,9 @@ import { StoreModal } from '../ui/store/StoreModal';
 import { demoStore } from '../ui/store/demoState';
 import type { AppearanceControl } from '../ui/appearanceControl';
 import { DayNightToggle, type MapVariant } from '../ui/DayNightToggle';
+import { MenuHub } from '../ui/menu/MenuHub';
+import { panelManager } from '../ui/menu/PanelManager';
+import { openProfilePanel } from '../ui/menu/ProfilePanel';
 import { LoadingBar } from '../ui/LoadingBar';
 import { loadCharacterAsset, buildAppearanceTexture, buildOutfitTexture, type CharacterAsset } from './CharacterAsset';
 import { loadEquipment, equipmentUrl, type EquipSlot } from './EquipmentLoader';
@@ -25,6 +28,7 @@ import { LocalPlayer3D, RemotePlayer3D, PX_TO_UNIT } from './Player3D';
 import { OverheadLayer } from './Overhead';
 import { audio } from '../audio/AudioManager';
 import { FishingController } from '../fishing/FishingController';
+import { fishSprite, tierStyle } from '../fishing/fishingManifest';
 
 /** ชื่อแมพบน HUD (ค่าเดิมจาก WorldScene — ย้ายไป map data เมื่อมีหลายแมพ) */
 const MAP_NAME = 'ค่ายมือใหม่';
@@ -144,6 +148,8 @@ export class World3D {
 
   private keys = new Set<string>();
   private inputEnabled = true;
+  /** นั่งตกปลาอยู่ — ล็อกการเดินจนกว่ารอบจะเฉลย (fishing:resolved) */
+  private fishingLock = false;
   private moveInput = new THREE.Vector2();
   // Orbit camera state (spherical around the player).
   private camYaw = 0;
@@ -158,9 +164,7 @@ export class World3D {
   // refs let dispose() clean up on return-to-menu (change character / logout).
   private readonly ac = new AbortController();
   private disposed = false;
-  private storeBtn?: HTMLButtonElement;
-  private menuBtn?: HTMLButtonElement;
-  private menu?: HTMLDivElement;
+  private hub!: MenuHub;
   private audioBtn?: HTMLButtonElement;
   private lastSent: SentState | null = null;
 
@@ -220,10 +224,25 @@ export class World3D {
     };
     this.customize = new CustomizePanel({
       control,
-      onOpenStore: () => this.openStore(control),
+      onOpenStore: () => this.hub.open('shop'),
+      onClose: () => panelManager.notifyClosed('customize'),
     });
-    this.makeStoreButton(control);
-    this.makeMenuButton();
+    this.hub = new MenuHub({
+      openers: {
+        shop: () => this.openStoreHandle(control),
+        customize: () => {
+          this.customize.show();
+          return () => this.customize.close();
+        },
+        profile: () =>
+          openProfilePanel({
+            name: this.init.name,
+            isGuest: !api.getToken(),
+            onChangeCharacter: () => this.returnToMenu(false),
+            onAuthAction: () => this.returnToMenu(true),
+          }),
+      },
+    });
     this.makeAudioButton();
     this.renderer.setAnimationLoop(() => this.tick());
   }
@@ -560,7 +579,7 @@ export class World3D {
 
   private readMoveInput() {
     this.moveInput.set(0, 0);
-    if (!this.inputEnabled) return;
+    if (!this.inputEnabled || this.fishingLock) return; // นั่งตกปลา = เดินไม่ได้
     // Touch joystick takes priority when pushed past a small deadzone.
     const j = this.joystick?.vector;
     if (j && Math.hypot(j.x, j.y) > 0.2) {
@@ -836,11 +855,41 @@ export class World3D {
       canInteract: () => this.inputEnabled, // กันกด F ระหว่างพิมพ์แชท
     });
 
-    // ผลตัดสินจาก server (client เล่นอนิเมชันตามผล — spec §5)
+    // มีคนเริ่มตกปลา (รวมตัวเราด้วย — render ทางเดียวแบบ chat): นั่งลง + บอลลูน 🎣
+    // เหนือหัว ทุกคนใน world เห็นเหมือน emote (ท่า sit เป็น placeholder จนกว่าจะมี
+    // คลิปท่าตกปลาจริง — เปลี่ยนที่ CONFIG.FISHING.ACTION)
+    const onStarted: ServerToClientEvents['fishing:started'] = ({ id }) => {
+      const isSelf = id === this.socket.id;
+      const target = isSelf ? this.player : this.remotes.get(id);
+      if (!target) return;
+      target.playAction(CONFIG.FISHING.ACTION);
+      if (isSelf) this.fishingLock = true; // นั่งอยู่ — ล็อกเดินจนกว่าจะเฉลย
+      this.overheads.ensure(isSelf ? 'self' : id, '').showFishing();
+    };
+
+    // เฉลยรอบ (ทุกคนเห็นพร้อมกัน): ลุกขึ้น + บอลลูนสลับเป็นปลาที่ได้ (กรอบสี tier)
+    // หรือ 💨 ตอนหลุด — "animation มาแทนที่ fishing แล้วโชว์ปลาที่ตกได้"
+    const onResolved: ServerToClientEvents['fishing:resolved'] = ({ id, fishId, tier, caught }) => {
+      const isSelf = id === this.socket.id;
+      const target = isSelf ? this.player : this.remotes.get(id);
+      if (isSelf) this.fishingLock = false;
+      if (!target) return;
+      target.stopAction();
+      const sprite = fishSprite(fishId);
+      const icon = caught ? (sprite.kind === 'placeholder' ? sprite.emoji : '🐟') : '💨';
+      const ring = caught ? tierStyle(tier).color : 'rgba(185,185,198,0.9)';
+      this.overheads
+        .ensure(isSelf ? 'self' : id, '')
+        .showFishResult(icon, ring, CONFIG.FISHING.RESULT_SHOW_MS);
+    };
+
+    // ผลตัดสินจาก server — รายละเอียดเต็มเฉพาะคนตก (การ์ดเฉลย + เสียง + เก็บเข้าถุง)
     const onResult: ServerToClientEvents['fishing:result'] = (r) => this.fishing.showResult(r);
     // ประกาศ epic/legendary ของคนอื่น → toast hype ("คนหันมามอง")
     const onAnnounce: ServerToClientEvents['fishing:announce'] = ({ name, fishId, tier }) =>
       this.fishing.hype(name, fishId, tier);
+    this.socket.on('fishing:started', onStarted);
+    this.socket.on('fishing:resolved', onResolved);
     this.socket.on('fishing:result', onResult);
     this.socket.on('fishing:announce', onAnnounce);
   }
@@ -878,34 +927,25 @@ export class World3D {
 
   // -------------------------------------------------------------- demo store
 
-  private storeOpen = false;
-
-  private openStore(control: AppearanceControl) {
-    if (this.storeOpen) return;
-    this.storeOpen = true;
+  /** เปิดร้าน (ผ่าน MenuHub/PanelManager — single-open จัดการให้แล้ว) คืน close handle */
+  private openStoreHandle(control: AppearanceControl): () => void {
     const modal = new StoreModal(control);
     const origDestroy = modal.destroy.bind(modal);
-    modal.destroy = () => { origDestroy(); this.storeOpen = false; };
-  }
-
-  private makeStoreButton(control: AppearanceControl) {
-    const btn = document.createElement('button');
-    btn.title = 'ร้านค้า';
-    btn.textContent = '🛒';
-    btn.className = 'side-btn s3';
-    btn.addEventListener('click', () => this.openStore(control));
-    document.body.appendChild(btn);
-    this.storeBtn = btn;
+    modal.destroy = () => {
+      origDestroy();
+      panelManager.notifyClosed('shop'); // ร้านปิดตัวเอง (✕/backdrop) → เคลียร์ state
+    };
+    return () => modal.destroy();
   }
 
   // -------------------------------------------------------------- audio
 
   private syncAudioBtn?: () => void;
 
-  /** ปุ่มเปิด/ปิดเสียง 🔊 (side-btn s5) — คุมทั้ง BGM + SFX (master mute) */
+  /** ปุ่มเปิด/ปิดเสียง 🔊 (side-btn s3 — ใต้ ☰ เมนู) — คุมทั้ง BGM + SFX (master mute) */
   private makeAudioButton() {
     const btn = document.createElement('button');
-    btn.className = 'side-btn s5';
+    btn.className = 'side-btn s3';
     const sync = () => {
       btn.textContent = audio.isMuted ? '🔇' : '🔊';
       btn.title = audio.isMuted ? 'เปิดเสียง' : 'ปิดเสียง';
@@ -922,49 +962,7 @@ export class World3D {
   }
 
   // ------------------------------------------------------------ world menu
-
-  /** ⚙️ button → popup with "change character" / "logout" (no page refresh). */
-  private makeMenuButton() {
-    const btn = document.createElement('button');
-    btn.title = 'เมนู';
-    btn.textContent = '⚙️';
-    btn.className = 'side-btn s4';
-
-    const menu = document.createElement('div');
-    menu.className = 'world-menu panel';
-    menu.style.display = 'none';
-    const mkItem = (label: string, onClick: () => void, danger = false) => {
-      const b = document.createElement('button');
-      b.className = 'world-menu-item' + (danger ? ' danger' : '');
-      b.textContent = label;
-      b.addEventListener('click', onClick);
-      return b;
-    };
-    const isGuest = !api.getToken();
-    menu.append(
-      mkItem('🔄 เปลี่ยนตัวละคร', () => this.returnToMenu(false)),
-      isGuest
-        ? mkItem('🔑 เข้าสู่ระบบ / สมัคร', () => this.returnToMenu(true))
-        : mkItem('🚪 ออกจากระบบ', () => this.returnToMenu(true), true),
-    );
-
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-    });
-    // click anywhere else closes it
-    window.addEventListener(
-      'pointerdown',
-      (e) => {
-        if (e.target !== btn && !menu.contains(e.target as Node)) menu.style.display = 'none';
-      },
-      { signal: this.ac.signal },
-    );
-
-    document.body.append(btn, menu);
-    this.menuBtn = btn;
-    this.menu = menu;
-  }
+  // (⚙️ world menu เดิมยุบเข้า MenuHub แล้ว — เปลี่ยนตัวละคร/เข้า-ออกระบบอยู่ใน panel โปรไฟล์)
 
   /** Leave the 3D world and go back to the entry flow without a page refresh. */
   private returnToMenu(logout: boolean) {
@@ -1001,9 +999,7 @@ export class World3D {
     safe(() => this.dayNight.destroy());
     safe(() => this.loading.destroy());
     safe(() => this.joystick?.destroy());
-    this.storeBtn?.remove();
-    this.menuBtn?.remove();
-    this.menu?.remove();
+    safe(() => this.hub.destroy()); // ถอด ☰ + grid + ปิด panel ที่ค้าง (panelManager.reset)
     this.audioBtn?.remove();
     document.body.classList.remove('touch');
 

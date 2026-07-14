@@ -309,8 +309,9 @@ guest (session_id)
 
 ทำทีละเฟส · ผ่าน AC ก่อนไปต่อ (แพตเทิร์นเดียวกับ U/D/F/S phases)
 
-- **PA0 — Hub foundation:** `MenuHub` + `panelRegistry` + `PanelManager` + `PanelShell`. ลงทะเบียน **ร้าน + แต่งตัว** (ของที่มี) + ยุบ ⚙️ เดิมเข้า Hub + ถอดปุ่มลอย `s2/s3/s4` + ยิง `panel_open`
-  **AC:** §2.5 ผ่านครบ · panel เดิมเปิดผ่าน Hub ได้ · ไม่มีปุ่มลอยเหลือ
+- **PA0 — Hub foundation:** ✅ **เสร็จแล้ว** — `MenuHub` + `panelRegistry` + `PanelManager` + `PanelShell` + `ComingSoonPanel` + `ProfilePanel` (stub). ลงทะเบียน **ร้าน + แต่งตัว + โปรไฟล์** + panel `planned` อีก 8 ตัวโชว์ "เร็วๆ นี้" + ยุบ ⚙️ เดิมเข้าโปรไฟล์ + ถอดปุ่มลอย `s2/s3/s4` (เสียงย้ายไป `s3`) + ยิง `panel_open`
+  **AC:** §2.5 ผ่านครบ (verify ในเบราว์เซอร์แล้ว: toggle/single-open/ESC/coming-soon/มือถือ 3 คอลัมน์)
+  *หมายเหตุ:* ปุ่มถุงปลา (`side-btn s6` จากงาน fishing ที่กำลังทำขนาน) ยังลอยอยู่ — ให้ยุบเข้า registry (`id:'bag'` เปลี่ยนเป็น live) ตอน PA3
 - **PA1 — Account/LINE + โปรไฟล์ (§5):** ★ ก่อนงาน social/growth เพราะ invite-5 ต้องพึ่ง social login. Backend LINE OAuth + panel โปรไฟล์ + onboarding family_name
   **AC:** §5.6 ผ่านครบ
 - **PA2 — ตั้งค่า:** รวม toggle กระจาย (เพลง/volume, กลางวัน-กลางคืน, reset demo) เข้า panel เดียว

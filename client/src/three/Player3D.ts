@@ -137,6 +137,19 @@ abstract class PlayerBase {
     this.emoteAction = action;
   }
 
+  /** ยกเลิกท่า emote ที่ค้างอยู่ (เช่นท่านั่งตกปลา) — เฟดกลับ idle ทันที
+   *  โดยไม่ต้องรอผู้เล่นขยับ (setAnim ปกติปลดเฉพาะตอนเดิน) */
+  stopAction() {
+    if (!this.emoteAction) return;
+    this.emoteAction.fadeOut(ANIM_FADE);
+    this.emoteAction = null;
+    const next = this.idle ?? this.walk;
+    if (next) {
+      next.reset().fadeIn(ANIM_FADE).play();
+      this.current = next;
+    }
+  }
+
   /** Swap the *base body* texture (color + face composite from CharacterAsset).
    *  While a costume is worn the base body is hidden, but its material still
    *  gets the texture so it's correct the moment the costume comes off. */

@@ -42,11 +42,15 @@ export const CONFIG = {
     ENABLED: true,
     PROMPT_KEY: 'KeyF',           // ปุ่มเริ่มตกปลาเมื่ออยู่ในเขตจุด
     MIN_CAST_INTERVAL_MS: 1500,   // กัน spam cast (server บังคับ)
-    // ระยะเวลามินิเกมฝั่ง client (แค่ presentation — ผลจริงมาจาก server)
+    // จังหวะรอบตกปลา — SERVER เป็นเจ้าของเวลา (สุ่มช่วงรอแล้วค่อย broadcast ผล
+    // ให้ทุก client พร้อมกัน) client ใช้แค่ sync เสียง/ภาพ + safety timeout
     CAST_MS: 900,                 // เหวี่ยง → เบ็ดตกน้ำ
-    WAIT_MIN_MS: 1200,            // รอปลากิน (สุ่มในช่วง)
+    WAIT_MIN_MS: 1200,            // รอปลากิน (server สุ่มในช่วงนี้)
     WAIT_MAX_MS: 3200,
-    HOOK_WINDOW_MS: 1100,         // หน้าต่างกด "ดึง!" หลังปลากิน
+    // ท่าตัวละครระหว่างตกปลา — ใช้คลิป 'sit' ไปก่อน (ค้างท่าจนกว่าจะยกเลิก)
+    // พอปั้นโมเดล/คลิปท่าตกปลาจริงเสร็จ เปลี่ยน id ตรงนี้ตัวเดียว โค้ดไม่ต้องแก้
+    ACTION: 'sit',
+    RESULT_SHOW_MS: 3500,         // บอลลูนโชว์ปลาที่ตกได้เหนือหัว (ทุกคนเห็น) กี่ ms
 
     // ความหายาก: สีกรอบตรงกับ StoreModal (common/rare/epic) + legendary ทอง
     // price = ราคาขาย (เกล็ด) / chance = %โอกาสจับที่ server ใช้ตัดสิน + โชว์บนจอ

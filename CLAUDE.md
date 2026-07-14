@@ -36,6 +36,16 @@ Characters are 2.5D: sprites pre-rendered from the game's 3D models.
 - HUD/panels/modals must be responsive down to mobile; canvas + overlay scale together.
 - Build U-phases (12tails-ui-roadmap.md) in order; a phase's acceptance criteria must pass before the next.
 
+## Panel/Menu rules (see 12tails-panel-control-plan.md)
+- Every menu panel registers in client/src/ui/menu/panelRegistry.ts (single source of truth). Never
+  hardcode panel lists or add floating buttons that open panels; the ☰ grid/deep-links/badges read the registry.
+- A new PanelId needs a source in our roadmap (ui-roadmap/web-BUILD-PLAN/fishing docs) — never copy buttons
+  from other games. Rod/bait = items in 'fishshop', not panels; the fishing minigame = overlay from a fishing
+  spot (press F), not a menu button; Collection/Gacha/BattlePass/Supporter = tabs inside StoreModal.
+- Open panels only through PanelManager (single-open, ESC, state). Reuse existing panels; don't rebuild them.
+- Roadmap-backed but unbuilt panels = status 'planned' (shown greyed "เร็วๆ นี้", still clickable) and every
+  open fires the panel_open analytics event — a coming-soon click is a demand signal for the dashboard.
+
 ## Web stack rules (/web + /api — same monorepo, see 12tails-web-BUILD-PLAN.md)
 - `/api` = Go (Echo+GORM+Uber FX+JWT) + PostgreSQL. Add a domain: Model → Store → Handler → Register(FX/api.Server) → Route → Migration. JSON is snake_case.
 - `/web` = Next.js (App Router, `output:'export'` static SPA) + Zustand (client state) + TanStack Query (server data) + Axios (ONE instance, `lib/api/axios.ts`). Don't fetch() directly and don't put server data in Zustand. Exception: analytics beacons in `lib/analytics/events.ts` use keepalive fetch to survive navigation (NOT sendBeacon — its json beacon is CORS-blocked). `/web` is its own npm project (NOT a root workspace); run it with `npm --prefix web run dev` (port 3000).

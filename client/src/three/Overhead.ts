@@ -13,7 +13,12 @@ function ensureBubbleStyle() {
     `.tt-bubble{position:relative}` +
     `.tt-bubble::after{content:'';position:absolute;left:50%;bottom:-8px;` +
     `transform:translateX(-50%);border:8px solid transparent;border-bottom:0;` +
-    `border-top-color:${BUBBLE_BG};filter:drop-shadow(0 2px 1px rgba(0,0,0,0.18))}`;
+    `border-top-color:${BUBBLE_BG};filter:drop-shadow(0 2px 1px rgba(0,0,0,0.18))}` +
+    // สถานะตกปลาเหนือหัว: 🎣 ลอยขึ้นลงระหว่างรอ / ปลาเด้ง pop ตอนเฉลย
+    `@keyframes tt-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}` +
+    `@keyframes tt-pop{0%{transform:scale(0.2)}70%{transform:scale(1.18)}100%{transform:scale(1)}}` +
+    `.tt-fishing{animation:tt-bob 1.2s ease-in-out infinite}` +
+    `.tt-fish-pop{animation:tt-pop 0.4s cubic-bezier(0.2,1.5,0.4,1)}`;
   document.head.appendChild(st);
 }
 
@@ -73,8 +78,10 @@ class Overhead {
   readonly el: HTMLDivElement;
   private bubble: HTMLDivElement;
   private emote: HTMLDivElement;
+  private status: HTMLDivElement;
   private bubbleTimer: number | undefined;
   private emoteTimer: number | undefined;
+  private statusTimer: number | undefined;
 
   constructor(name: string, familyName?: string) {
     this.el = document.createElement('div');
@@ -87,6 +94,13 @@ class Overhead {
       `width:${EMOTE_ICON}px;height:${EMOTE_ICON}px;display:none;border-radius:50%;` +
       'background-color:rgba(255,255,255,0.95);border:2px solid rgba(185,185,198,0.9);' +
       'background-repeat:no-repeat;';
+
+    // สถานะกิจกรรมค้าง (ตกปลา) — วงกลมแบบ emote แต่อยู่จนกว่าจะสั่งเคลียร์
+    this.status = document.createElement('div');
+    this.status.style.cssText =
+      `width:${EMOTE_ICON}px;height:${EMOTE_ICON}px;display:none;border-radius:50%;` +
+      'background-color:rgba(255,255,255,0.95);border:2px solid rgba(185,185,198,0.9);' +
+      'align-items:center;justify-content:center;font-size:26px;line-height:1;';
 
     ensureBubbleStyle();
     this.bubble = document.createElement('div');
@@ -118,7 +132,37 @@ class Overhead {
       tag.style.color = '#fff';
     }
 
-    this.el.append(this.emote, this.bubble, tag);
+    this.el.append(this.status, this.emote, this.bubble, tag);
+  }
+
+  /** โชว์บอลลูน 🎣 ค้างเหนือหัวระหว่างตกปลา (ทุกคนใน world เห็น) */
+  showFishing() {
+    window.clearTimeout(this.statusTimer);
+    this.status.className = 'tt-fishing';
+    this.status.textContent = '🎣';
+    this.status.style.borderColor = 'rgba(185,185,198,0.9)';
+    this.status.style.boxShadow = 'none';
+    this.status.style.display = 'flex';
+  }
+
+  /**
+   * สลับบอลลูนตกปลาเป็นผล: อิโมจิปลา + วงแหวนสี tier (หรือ 💨 ตอนหลุด)
+   * โชว์ค้าง `ms` แล้วหายเอง — คือ "animation มาแทนที่ fishing แล้วโชว์ปลา"
+   */
+  showFishResult(icon: string, ringColor: string, ms: number) {
+    window.clearTimeout(this.statusTimer);
+    this.status.className = 'tt-fish-pop';
+    this.status.textContent = icon;
+    this.status.style.borderColor = ringColor;
+    this.status.style.boxShadow = `0 0 12px ${ringColor}`;
+    this.status.style.display = 'flex';
+    this.statusTimer = window.setTimeout(() => this.clearFishing(), ms);
+  }
+
+  /** เคลียร์บอลลูนสถานะตกปลา (จบรอบ/คนตกออกจากโลก) */
+  clearFishing() {
+    window.clearTimeout(this.statusTimer);
+    this.status.style.display = 'none';
   }
 
   showBubble(text: string) {

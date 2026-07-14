@@ -14,7 +14,7 @@ import { API_URL, getToken } from './api';
  * `buy_intent` = an interest signal (a demo unlock), NOT a real sale.
  */
 
-export type EventType = 'game_open' | 'play_start' | 'shop_open' | 'buy_intent';
+export type EventType = 'game_open' | 'play_start' | 'shop_open' | 'buy_intent' | 'panel_open';
 
 const SESSION_KEY = '12tails-session-id';
 
@@ -103,6 +103,15 @@ export function trackPlayStart(characterId: string, opts: { guest: boolean }): v
 /** Opened the demo store on a given tab. */
 export function trackShopOpen(tab: string): void {
   track('shop_open', { meta: { tab } });
+}
+
+/**
+ * Opened a menu panel (Panel Hub). Fired for EVERY panel including "เร็วๆ นี้"
+ * ones — a coming-soon click (status: 'planned') is a demand signal for that
+ * feature, powering the dashboard's build-priority view.
+ */
+export function trackPanelOpen(id: string, status: string): void {
+  track('panel_open', { meta: { id, status } });
 }
 
 export interface BuyIntentInput {
