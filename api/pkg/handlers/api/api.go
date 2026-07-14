@@ -18,13 +18,14 @@ import (
 // Server holds the Echo instance and its injected dependencies (one field per
 // store, mirroring the team's Go template).
 type Server struct {
-	Config         core.Config
-	Log            *logrus.Logger
-	EventStore     models.EventStore
-	WaitlistStore  models.WaitlistStore
-	UserStore      models.UserStore
-	CharacterStore models.CharacterStore
-	TopUpStore     models.TopUpStore
+	Config          core.Config
+	Log             *logrus.Logger
+	EventStore      models.EventStore
+	WaitlistStore   models.WaitlistStore
+	UserStore       models.UserStore
+	CharacterStore  models.CharacterStore
+	TopUpStore      models.TopUpStore
+	CollectionStore models.CollectionStore
 
 	echo *echo.Echo
 }
@@ -38,11 +39,13 @@ func NewServer(
 	us models.UserStore,
 	cs models.CharacterStore,
 	ts models.TopUpStore,
+	cols models.CollectionStore,
 ) *Server {
 	s := &Server{
 		Config: cfg, Log: log,
 		EventStore: es, WaitlistStore: ws,
 		UserStore: us, CharacterStore: cs, TopUpStore: ts,
+		CollectionStore: cols,
 	}
 	s.echo = s.build()
 	return s
@@ -68,6 +71,9 @@ func (s *Server) build() *echo.Echo {
 	e.POST("/track", s.Track)
 	e.POST("/waitlist", s.Waitlist)
 
+	// Public store — the ONE source of what is on sale now (game/demo read this).
+	e.GET("/store/active", s.StoreActive)
+
 	// Public auth (standalone register + login). Social linking comes later.
 	e.POST("/auth/register", s.Register)
 	e.POST("/auth/login", s.Login)
@@ -86,6 +92,17 @@ func (s *Server) build() *echo.Echo {
 	admin.GET("/metrics", s.AdminMetrics)
 	admin.GET("/events/export", s.AdminExport)
 
+	// Season scheduling (Phase 5): collection + item CRUD, rotation, override.
+	admin.GET("/collections", s.AdminListCollections)
+	admin.POST("/collections", s.AdminCreateCollection)
+	admin.PATCH("/collections/:id", s.AdminUpdateCollection)
+	admin.DELETE("/collections/:id", s.AdminDeleteCollection)
+	admin.PATCH("/collections/:id/status", s.AdminSetCollectionStatus)
+	admin.POST("/collections/:id/duplicate", s.AdminDuplicateCollection)
+	admin.POST("/collections/:id/items", s.AdminCreateItem)
+	admin.PATCH("/collections/:id/items/:itemId", s.AdminUpdateItem)
+	admin.DELETE("/collections/:id/items/:itemId", s.AdminDeleteItem)
+
 	return e
 }
 
@@ -101,7 +118,11 @@ func (s *Server) cors() echo.MiddlewareFunc {
 	}
 	return middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowOrigins: origins,
-		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+		// PATCH/DELETE are needed for the admin season CRUD (Phase 5).
+		AllowMethods: []string{
+			http.MethodGet, http.MethodPost, http.MethodPatch,
+			http.MethodDelete, http.MethodOptions,
+		},
 		AllowHeaders: []string{echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization, "X-Session-Id"},
 	})
 }

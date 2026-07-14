@@ -40,8 +40,8 @@
 - [x] **Next.js frontend (`/web`) — landing** ✅ **Phase 3 เสร็จ** (Next 15 + TS + Tailwind + Zustand + TanStack + Axios · พอร์ต landing จาก mockup · waitlist→`POST /waitlist` · ยิง page_view/cta_click/waitlist_signup · consent banner · verify กับ Postgres จริง + static export ผ่าน) · admin UI = Phase 4
 - [ ] **บัญชีผู้เล่น + โปรไฟล์เกม** ⭐ — register/login, `family_name` ถาวร, `Character`+slots, nameplate 2 บรรทัด, ประวัติเติมเงิน (ตอนนี้ชื่อเป็น ephemeral ไม่มีบัญชี → นับคนจริง/รู้ว่าใครเติมไม่ได้)
 - [x] **เกมยิง analytics** ⭐ — ✅ **Phase 2 เสร็จ** · `client/src/net/track.ts` (session UUID + JWT→account_id) ยิง `game_open`/`play_start`/`shop_open`/`buy_intent` → `POST /track` · `demoStore.buy()` แนบ `item_id`+`price_jil` (verify กับ Postgres จริงแล้ว)
-- [ ] **Admin dashboard** — funnel, demand ranking, would-be revenue, CSV export
-- [ ] **Season scheduling** — `Collection`/`CosmeticItem`, `GET /store/active`, timeline
+- [x] **Admin dashboard** — funnel, demand ranking, would-be revenue, CSV export — ✅ **Phase 4 เสร็จ**
+- [x] **Season scheduling** — `Collection`/`CosmeticItem`, `GET /store/active`, Gantt timeline, เวียนขาย (duplicate), demand-per-season — ✅ **Phase 5 เสร็จ**
 - [ ] **ระบบตกปลา (backend)** — server-roll `POST /fishing/cast`, เกล็ด wallet, inventory/Fishdex, retention metrics (มีแต่ spec)
 - [ ] Waitlist, consent banner, Discord/community CTA, SEO/OG
 
@@ -217,12 +217,14 @@
 - **AC ✅ verify แล้ว (end-to-end):** login admin → dashboard โหลด metrics จริงจาก Go API · กราฟ "ชุดที่คนอยากซื้อสุด" ขึ้น bar · funnel % ถูก · Export CSV ได้ (200 text/csv) · authz 401/403 · `next build` static export ผ่าน (landing SSG + admin SPA)
 - 🔜 deploy จริง (CF Pages + AWS API) = Phase 6 · ตอนรัน: restart Go API ด้วยโค้ด Phase 4 + ตั้ง `ADMIN_EMAIL`/`ADMIN_PASSWORD` (seed admin) + `web` `NEXT_PUBLIC_API_URL` ชี้ API
 
-### Phase 5 — Season scheduling  `(= S0–S4)`
-- [ ] **Go:** domain **Collection** + **CosmeticItem** (+ seed "ชุดฤดูร้อน") + `utils/liveness` (`isLiveNow`/`statusLabel` — **computed on read, ไม่มี cron**)
-- [ ] **Go:** `GET /store/active` (public) คืนเฉพาะ live + `ends_at` · admin CRUD collection/item + `POST …/duplicate` (เวียนขาย, status=draft) + override live/off/draft
-- [ ] **Web (admin):** หน้ารายการ+แก้ไข (date picker) + **★ Gantt/timeline** เห็นช่วงขายทุกคอลเลกชัน + จับช่องว่าง/ทับซ้อน
-- [ ] **เดโมร้าน:** อ่าน `/store/active` + **countdown FOMO** · `buy_intent` แนบ `collection_id` → dashboard "ดีมานด์ต่อซีซัน"
-- **AC:** ตั้งวันแล้วของขึ้น/หายตามเวลา · duplicate คลิกเดียว · dashboard เทียบดีมานด์ระหว่างซีซันได้
+### Phase 5 — Season scheduling  `(= S0–S4)` ✅ เสร็จแล้ว (Go + Web + เกม)
+- [x] **Go:** domain **Collection** + **CosmeticItem** (+ seed 3 ซีซัน: ฤดูร้อน=live, สงกรานต์=ended, ฮาโลวีน=scheduled) + `pkg/utils/liveness` (`IsLiveNow`/`StatusLabel` — **computed on read, ไม่มี cron** · unit-tested) · migration `20260714_phase_s_collections` · `seedCollections` (idempotent, รันเมื่อ Count()==0)
+- [x] **Go:** `GET /store/active` (public) คืนเฉพาะ live + `ends_at` + `server_time` (countdown แม่นแม้ clock เพี้ยน) · admin CRUD collection/item + `POST …/duplicate` (เวียนขาย → draft, ล้างวันที่, คัดลอก items) + `PATCH …/status` override live/off/draft · CORS เพิ่ม PATCH/DELETE
+- [x] **Web (admin):** `/admin/seasons` — รายการ + ตัวกรองสถานะ + buy_intent/ซีซัน · editor drawer (date picker + item CRUD + live status preview) + **★ Gantt timeline** (past/live/future, เส้น "วันนี้", คลิกแถบ→แก้ไข) · `lib/store/liveness.ts` (mirror Go) · nav แดชบอร์ด↔ซีซัน
+- [x] **เดโมร้าน (เกม):** แท็บ "ซีซัน 🔥" ใน `StoreModal` อ่าน `/store/active` (`net/storeApi.ts`) + **countdown FOMO** (tick 30s) · `buySeasonItem` แนบ `collection_id`+`theme` → `buy_intent` → dashboard "ดีมานด์ต่อซีซัน"
+- [x] **Web (dashboard):** `EventStore.DemandByCollection` (join collections) → `/admin/metrics` `demand_by_season` → กราฟ "★ ดีมานด์ต่อซีซัน" (Recharts)
+- **AC ✅ verify แล้ว (curl end-to-end):** ตั้งวัน→ของขึ้น/หายตามเวลา (`/store/active` คืนเฉพาะ live) · schedule/override live/off ได้จริง · duplicate คลิกเดียว (draft, ล้างวันที่, copy items) · demand_by_season รวม 3 intents/summer=3600, 1/halloween=1400 · `next build` static export ผ่าน (route `/admin/seasons`) · liveness go test ผ่าน
+- 🔜 ตอนรัน: rebuild Go API ด้วยโค้ด Phase 5 (docker-compose ผ่าน ADMIN_* + CLIENT_ORIGIN มี `:3000` แล้ว)
 
 ### Phase 6 — Polish + deploy  `(= L5–L6)`
 - [ ] SEO/OG tags · feedback survey ("อยากได้ชุด/เผ่าแบบไหน" → event `feedback`)

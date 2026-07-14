@@ -90,6 +90,39 @@ export function DemandChart({ demand }: { demand: Metrics['demand'] }) {
   );
 }
 
+/** ดีมานด์ต่อซีซัน — buy_intent grouped by collection, proving the rotation model. */
+export function DemandBySeasonChart({ demand }: { demand: Metrics['demand_by_season'] }) {
+  const data = demand.slice(0, 10).map((d) => ({
+    name: d.name || d.theme || d.collection_id.slice(0, 8),
+    intents: d.intents,
+    revenue: d.would_be_revenue,
+  }));
+  return (
+    <section className="panel p-5">
+      <h2 className="mb-1 font-head text-lg text-ink">ดีมานด์ต่อซีซัน</h2>
+      <p className="mb-3 text-xs text-muted">buy_intent ต่อคอลเลกชัน — เทียบว่าซีซันไหนคนอยากซื้อเยอะ (ความสนใจ ไม่ใช่ยอดขาย)</p>
+      {data.length === 0 ? (
+        <Empty />
+      ) : (
+        <ResponsiveContainer width="100%" height={Math.max(160, data.length * 36)}>
+          <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
+            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: MUTED }} />
+            <YAxis type="category" dataKey="name" width={128} tick={{ fontSize: 11, fill: INK }} />
+            <Tooltip
+              cursor={{ fill: `${ACCENT2}14` }}
+              formatter={(v: number, key) => [
+                v.toLocaleString('th-TH'),
+                key === 'intents' ? 'buy_intent' : 'Jil (ประมาณการ)',
+              ]}
+            />
+            <Bar dataKey="intents" fill={ACCENT2} radius={[0, 6, 6, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </section>
+  );
+}
+
 /** Daily activity — sessions vs buy_intent over the range. */
 export function TimeSeriesChart({ series }: { series: Metrics['timeseries'] }) {
   return (

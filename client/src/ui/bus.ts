@@ -7,7 +7,7 @@
 // game -> UI
 export interface GameToUI {
   'player:self': { characterId: string; name: string; level: number; xp: number; xpMax: number };
-  'player:currency': { jil: number; coins: number }; // ค่า demo
+  'player:currency': { jil: number; scales: number }; // Jil (เติมเงิน) + เกล็ด (จากตกปลา) — คนละสกุลเด็ดขาด
   'players:count': { online: number };
   'chat:log': { id: string; name: string; text: string; ts: number };
   'system:message': { text: string }; // "X เข้ามา"

@@ -1,3 +1,5 @@
+import { CONFIG } from '@12tails/shared/config';
+import type { FishTier } from '@12tails/shared/events';
 import { gameToUI } from '../bus';
 import { trackBuyIntent } from '../../net/track';
 
@@ -15,11 +17,22 @@ export type Rarity = 'common' | 'rare' | 'epic';
 
 const STORAGE_KEY = '12tails-demo-store-v1';
 const START_JIL = 1200;
-const DEMO_COINS = 300; // second currency, static in the demo
+const START_SCALES = 0; // เกล็ด: สกุลเงินจากตกปลา (แยกจาก Jil เด็ดขาด — spec §2)
+
+/** ราคาขายปลา (เกล็ด) จาก tier — lookup จาก CONFIG.FISHING */
+const FISH_TIER = new Map<string, FishTier>(
+  CONFIG.FISHING.FISH.map((f) => [f.id, f.tier as FishTier]),
+);
+export function fishPrice(fishId: string): number {
+  const tier = FISH_TIER.get(fishId);
+  return tier ? CONFIG.FISHING.TIERS[tier].price : 0;
+}
 
 interface Persisted {
   jil: number;
   owned: string[];
+  scales?: number;
+  caught?: Record<string, number>; // fishId -> จำนวนในกระเป๋า (ยังไม่ขาย)
 }
 
 export function cosmeticId(hero: string, type: CosmeticType, index: number): string {
@@ -50,7 +63,9 @@ export function rarityOf(type: CosmeticType, index: number): Rarity {
 
 class DemoStore {
   private jil = START_JIL;
+  private scales = START_SCALES;
   private owned = new Set<string>();
+  private caught = new Map<string, number>(); // fishId -> count in inventory
   private listeners = new Set<() => void>();
 
   constructor() {
@@ -63,7 +78,9 @@ class DemoStore {
       if (raw) {
         const p = JSON.parse(raw) as Persisted;
         this.jil = typeof p.jil === 'number' ? p.jil : START_JIL;
+        this.scales = typeof p.scales === 'number' ? p.scales : START_SCALES;
         this.owned = new Set(Array.isArray(p.owned) ? p.owned : []);
+        this.caught = new Map(Object.entries(p.caught ?? {}));
       }
     } catch {
       /* corrupt/absent — start fresh */
@@ -72,7 +89,12 @@ class DemoStore {
 
   private save() {
     try {
-      const data: Persisted = { jil: this.jil, owned: [...this.owned] };
+      const data: Persisted = {
+        jil: this.jil,
+        scales: this.scales,
+        owned: [...this.owned],
+        caught: Object.fromEntries(this.caught),
+      };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
       /* private mode etc. — demo still works in-memory */
@@ -92,11 +114,56 @@ class DemoStore {
 
   /** Push the wallet to the HUD (via the game→UI bus). */
   emitCurrency() {
-    gameToUI.emit('player:currency', { jil: this.jil, coins: DEMO_COINS });
+    gameToUI.emit('player:currency', { jil: this.jil, scales: this.scales });
   }
 
   getJil(): number {
     return this.jil;
+  }
+
+  // ---------------------------------------------------------------- ตกปลา
+
+  getScales(): number {
+    return this.scales;
+  }
+
+  /** เก็บปลาที่ตกได้เข้ากระเป๋า (ยังไม่ได้เกล็ดจนกว่าจะขาย — spec §8) */
+  addFish(fishId: string) {
+    this.caught.set(fishId, (this.caught.get(fishId) ?? 0) + 1);
+    this.changed();
+  }
+
+  fishCount(fishId: string): number {
+    return this.caught.get(fishId) ?? 0;
+  }
+
+  /** รายการปลาในกระเป๋า (fishId + จำนวน) เรียงตามลำดับใน CONFIG */
+  inventory(): { fishId: string; count: number }[] {
+    return CONFIG.FISHING.FISH.map((f) => ({ fishId: f.id, count: this.caught.get(f.id) ?? 0 })).filter(
+      (e) => e.count > 0,
+    );
+  }
+
+  /** ขายปลา 1 ตัว → ได้เกล็ดตามราคา tier · คืนจำนวนเกล็ดที่ได้ (0 = ไม่มีปลานั้น) */
+  sellFish(fishId: string): number {
+    const n = this.caught.get(fishId) ?? 0;
+    if (n <= 0) return 0;
+    const gain = fishPrice(fishId);
+    if (n === 1) this.caught.delete(fishId);
+    else this.caught.set(fishId, n - 1);
+    this.scales += gain;
+    this.changed();
+    return gain;
+  }
+
+  /** ขายปลาทั้งกระเป๋า → คืนเกล็ดรวมที่ได้ */
+  sellAll(): number {
+    let total = 0;
+    for (const [fishId, n] of this.caught) total += fishPrice(fishId) * n;
+    this.caught.clear();
+    this.scales += total;
+    this.changed();
+    return total;
   }
 
   isOwned(hero: string, type: CosmeticType, index: number): boolean {
@@ -127,6 +194,37 @@ class DemoStore {
     return true;
   }
 
+  isSeasonOwned(itemId: string): boolean {
+    return this.owned.has(`season:${itemId}`);
+  }
+
+  /**
+   * Buy a scheduled-season item (Phase 5 / S4). Unlike cosmetics these come from
+   * the server's /store/active, so ownership is keyed by the item's server id and
+   * buy_intent carries the collection_id/theme → the admin "ดีมานด์ต่อซีซัน"
+   * chart. Still a DEMO unlock, never a real sale.
+   */
+  buySeasonItem(
+    item: { id: string; type: string; priceJil: number; rarity?: string },
+    collection: { id: string; theme?: string },
+  ): boolean {
+    const key = `season:${item.id}`;
+    if (this.owned.has(key)) return true;
+    if (this.jil < item.priceJil) return false;
+    this.jil -= item.priceJil;
+    this.owned.add(key);
+    this.changed();
+    trackBuyIntent({
+      itemId: item.id,
+      itemType: `season_${item.type}`,
+      priceJil: item.priceJil,
+      rarity: item.rarity,
+      collectionId: collection.id,
+      theme: collection.theme,
+    });
+    return true;
+  }
+
   /** Grant a cosmetic for free (e.g. the look chosen at character select). */
   grant(hero: string, type: CosmeticType, index: number) {
     if (this.isOwned(hero, type, index)) return;
@@ -142,7 +240,9 @@ class DemoStore {
 
   reset() {
     this.jil = START_JIL;
+    this.scales = START_SCALES;
     this.owned.clear();
+    this.caught.clear();
     this.changed();
   }
 }

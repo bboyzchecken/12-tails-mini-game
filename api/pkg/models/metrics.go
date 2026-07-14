@@ -32,6 +32,16 @@ type CountRow struct {
 	Count int64  `json:"count"`
 }
 
+// CollectionDemandRow ranks buy_intent per season (Phase 5) — the "ดีมานด์ต่อ
+// ซีซัน" chart that proves the rotation model to Bigbug. Interest, not sales.
+type CollectionDemandRow struct {
+	CollectionID   string `json:"collection_id"`
+	Name           string `json:"name"`  // joined from collections (may be empty if deleted)
+	Theme          string `json:"theme"` // from the event meta at buy time
+	Intents        int64  `json:"intents"`
+	WouldBeRevenue int64  `json:"would_be_revenue"` // Σ price_jil across those intents
+}
+
 // TopUpTotal is demo top-up history aggregated per account (attribution is real
 // even though the payment is mock).
 type TopUpTotal struct {

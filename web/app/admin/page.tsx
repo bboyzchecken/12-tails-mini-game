@@ -2,12 +2,13 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { AxiosError } from 'axios';
 import { useAuth } from '@/lib/store/auth';
 import { useFilters } from '@/lib/store/filters';
 import { useMetrics } from '@/lib/api/queries';
 import { Cards } from '@/components/admin/Cards';
-import { Funnel, DemandChart, TimeSeriesChart } from '@/components/admin/Charts';
+import { Funnel, DemandChart, DemandBySeasonChart, TimeSeriesChart } from '@/components/admin/Charts';
 import { TopupsTable, ReferrersTable } from '@/components/admin/Tables';
 import { Controls } from '@/components/admin/Controls';
 
@@ -47,6 +48,12 @@ export default function AdminDashboard() {
           แดชบอร์ดดีมานด์{' '}
           <span className="align-middle rounded-md bg-danger px-2 py-0.5 text-xs text-white">DEMO</span>
         </h1>
+        <nav className="flex items-center gap-1 text-sm">
+          <span className="rounded-full bg-accent px-3 py-1 text-white">แดชบอร์ด</span>
+          <Link href="/admin/seasons" className="rounded-full px-3 py-1 text-soft hover:bg-line/40">
+            ซีซัน
+          </Link>
+        </nav>
         <div className="ml-auto flex items-center gap-3 text-sm text-muted">
           {family && <span>{family}</span>}
           <button type="button" className="btn btn-ghost py-1" onClick={signOut}>
@@ -71,6 +78,7 @@ export default function AdminDashboard() {
             <Funnel funnel={data.funnel} />
             <DemandChart demand={data.demand} />
           </div>
+          <DemandBySeasonChart demand={data.demand_by_season} />
           <TimeSeriesChart series={data.timeseries} />
           <div className="grid gap-4 lg:grid-cols-2">
             <TopupsTable topups={data.topups} />

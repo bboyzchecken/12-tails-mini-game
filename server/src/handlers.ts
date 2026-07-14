@@ -9,6 +9,7 @@ import type {
 } from '@12tails/shared/events';
 import { CONFIG } from '@12tails/shared/config';
 import { world } from './world';
+import { rollFishing, shouldAnnounce } from './fishing';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -68,6 +69,8 @@ function sanitizeChat(raw: unknown): string {
 
 /** Last emote timestamp per socket — server-side spam guard. */
 const lastEmoteAt = new Map<string, number>();
+/** Last fishing-cast timestamp per socket — throttles the authoritative roll. */
+const lastCastAt = new Map<string, number>();
 
 export function registerHandlers(io: IO, socket: Sock) {
   socket.on('player:join', (p) => {
@@ -132,8 +135,26 @@ export function registerHandlers(io: IO, socket: Sock) {
     io.emit('appearance:changed', { id: socket.id, appearance });
   });
 
+  socket.on('fishing:cast', (p) => {
+    const player = world.get(socket.id);
+    if (!player) return; // must join before fishing
+    const now = Date.now();
+    const last = lastCastAt.get(socket.id) ?? 0;
+    if (now - last < CONFIG.FISHING.MIN_CAST_INTERVAL_MS) return; // spam guard
+    const spotId = String(p?.spotId ?? '').slice(0, 32);
+    const result = rollFishing(spotId); // server ตัดสินผล (สุ่มปลา + ติด/หลุด)
+    if (!result) return; // spotId ไม่รู้จัก
+    lastCastAt.set(socket.id, now);
+    socket.emit('fishing:result', result); // ส่งกลับเฉพาะคนตก
+    // ประกาศ epic/legendary กลางแชท (hype — spec §9)
+    if (shouldAnnounce(result)) {
+      io.emit('fishing:announce', { name: player.name, fishId: result.fishId, tier: result.tier });
+    }
+  });
+
   socket.on('disconnect', () => {
     lastEmoteAt.delete(socket.id);
+    lastCastAt.delete(socket.id);
     if (world.remove(socket.id)) {
       socket.broadcast.emit('player:left', { id: socket.id });
       console.log(`[server] left: ${socket.id} · ${world.count} online`);

@@ -42,11 +42,12 @@ Characters are 2.5D: sprites pre-rendered from the game's 3D models.
 - Analytics taxonomy: TS at `web/lib/analytics/events.ts` mirrors `client/src/net/track.ts`; Go models (`api/pkg/models/event.go`) mirror too. Never inline an event shape. `buy_intent` = interest signal, NEVER a sale — dashboard copy says "ความสนใจ/ประมาณการ", never "ยอดขาย".
 - Identity: guest = anonymous `session_id` (client UUID in localStorage, shared key `12tails-session-id` with the game); logged-in adds `account_id`. `X-Session-Id` is allow-listed in Go CORS. Landing/admin origins (incl. `http://localhost:3000` for dev) must be in `CLIENT_ORIGIN`.
 - Landing: art placeholder/original + "fan project" label until Bigbug approves. Warm/rounded design tokens live in `web/tailwind.config.ts` (same brand as the game); never hardcode colors. Fonts self-hosted via next/font (no Google Fonts request). Respect the consent banner; keep no PII beyond a waitlist email.
+- Season scheduling (Phase 5): "On sale now" is COMPUTED on read via `api/pkg/utils/liveness` (mirror `web/lib/store/liveness.ts`) — never a cron or a persisted live flag. status = draft|scheduled|live|ended: draft/ended force off, live forces on (override), scheduled derives from the date window. `GET /store/active` (public) is the ONLY source of what's sellable now — the game/demo read it, never a hardcoded list. Seasonal rotation (เวียนขาย) = `POST …/duplicate` (clone → draft, dates cleared); never mutate a past season. Sales stay MOCK: buying a season item fires `buy_intent` with `collection_id`+`theme` (→ dashboard "ดีมานด์ต่อซีซัน"), never "ยอดขาย". Item `preview` is a placeholder until Bigbug approves.
 - Deploy (Phase 6): `/web` + game client → Cloudflare Pages (static export); Go API + Node relay → AWS; Postgres → RDS. Keep `/web` static-exportable — no Next server routes / SSR-only features.
 
 ## Build order
 Implement 12tails-chat-PLAN.md phase by phase (core mechanics — done), then
 12tails-ui-roadmap.md U0–U6 (UI + demo business model). Do NOT start a phase
 until the previous phase's acceptance criteria pass. Commit after each phase.
-Web (landing + admin + analytics): 12tails-web-BUILD-PLAN.md — Phase 1/2/3/P/4-backend
-done; next = Phase 4 admin dashboard UI, then 5/6/F.
+Web (landing + admin + analytics): 12tails-web-BUILD-PLAN.md — Phase 1/2/3/P/4/5
+done; next = Phase 6 (polish + deploy), then F (fishing).

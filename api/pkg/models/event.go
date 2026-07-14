@@ -31,6 +31,7 @@ type EventStore interface {
 	WouldBeRevenue(from, to time.Time) (int64, error)
 	Funnel(stages []string, from, to time.Time) ([]FunnelStage, error)
 	Demand(from, to time.Time, limit int) ([]DemandRow, error)
+	DemandByCollection(from, to time.Time) ([]CollectionDemandRow, error)
 	TimeSeries(from, to time.Time) ([]DailyPoint, error)
 	Referrers(from, to time.Time, limit int) ([]CountRow, error)
 	ListForExport(from, to time.Time, limit int) ([]*Event, error)

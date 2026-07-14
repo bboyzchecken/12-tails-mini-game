@@ -3,6 +3,7 @@ import type { AppearanceControl } from '../appearanceControl';
 import { getHeroEquipment, getHeroCostumes } from '../equipmentIndex';
 import { getEquipThumb } from '../EquipThumbs';
 import { trackShopOpen } from '../../net/track';
+import { getActiveStore, type ActiveCollection } from '../../net/storeApi';
 import {
   demoStore, priceOf, rarityOf, type CosmeticType, type Rarity,
 } from './demoState';
@@ -31,6 +32,17 @@ function pretty(name: string): string {
   return name.replace(/([a-z])([A-Z0-9])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
 }
 
+/** Human countdown for the season FOMO chip (Thai). */
+function fmtCountdown(ms: number): string {
+  if (ms <= 0) return 'หมดเวลาแล้ว';
+  const d = Math.floor(ms / 86_400_000);
+  const h = Math.floor((ms % 86_400_000) / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  if (d > 0) return `เหลือ ${d} วัน ${h} ชม.`;
+  if (h > 0) return `เหลือ ${h} ชม. ${m} นาที`;
+  return `เหลือ ${m} นาที`;
+}
+
 /**
  * DEMO cosmetic shop: buy body colors / faces / weapons / hats with mock Jil,
  * preview them live on your character before buying, reset anytime. Every
@@ -47,6 +59,12 @@ export class StoreModal {
   private selected = 0;
   private equipped: Appearance;
   private unsub: () => void;
+  // Season tab (Phase 5 / S4): scheduled items read from GET /store/active.
+  private seasonMode = false;
+  private seasons: ActiveCollection[] = [];
+  private serverOffset = 0; // serverTime − clientTime, for accurate countdowns
+  private seasonLoaded = false;
+  private countdownTimer = 0;
 
   constructor(private control: AppearanceControl) {
     this.equipped = { ...control.get() };
@@ -78,12 +96,24 @@ export class StoreModal {
       });
 
     const tabRow = this.root.querySelector('.store-tabs') as HTMLDivElement;
+    // Season tab first — the scheduled/FOMO section (reads /store/active).
+    const seasonBtn = document.createElement('button');
+    seasonBtn.className = 'store-tab season-tab';
+    seasonBtn.textContent = 'ซีซัน 🔥';
+    seasonBtn.dataset.key = 'season';
+    seasonBtn.addEventListener('click', () => {
+      if (!this.seasonMode) trackShopOpen('season');
+      this.seasonMode = true;
+      this.render();
+    });
+    tabRow.appendChild(seasonBtn);
     for (const t of TABS) {
       const b = document.createElement('button');
       b.className = 'store-tab';
       b.textContent = t.label;
       b.dataset.key = t.key;
       b.addEventListener('click', () => {
+        this.seasonMode = false;
         this.tab = t.key;
         this.selected = this.equippedIndex();
         this.render();
@@ -92,11 +122,16 @@ export class StoreModal {
     }
 
     this.unsub = demoStore.subscribe(() => this.render());
+    // Keep the countdown ticking while the season tab is open.
+    this.countdownTimer = window.setInterval(() => {
+      if (this.seasonMode) this.render();
+    }, 30_000);
     trackShopOpen(this.tab); // constructed only on open (World3D guards double-open)
     void this.init();
   }
 
   private async init() {
+    void this.loadSeasons();
     try {
       const idx = await (await fetch('assets/cosmetics/index.json')).json();
       const c = idx[this.control.characterId];
@@ -133,7 +168,13 @@ export class StoreModal {
   private render() {
     this.jilLabel.textContent = demoStore.getJil().toLocaleString('th-TH');
     (this.root.querySelectorAll('.store-tab') as NodeListOf<HTMLElement>).forEach((el) =>
-      el.classList.toggle('on', el.dataset.key === this.tab));
+      el.classList.toggle('on', this.seasonMode ? el.dataset.key === 'season' : el.dataset.key === this.tab));
+
+    if (this.seasonMode) {
+      this.renderSeason();
+      return;
+    }
+    this.grid.classList.remove('season');
 
     const hero = this.control.characterId;
     const tab = this.tab;
@@ -270,6 +311,106 @@ export class StoreModal {
     this.render();
   }
 
+  /** Fetch the currently-live seasons from the API (Phase 5 / S4). */
+  private async loadSeasons() {
+    try {
+      const store = await getActiveStore();
+      this.seasons = store.collections;
+      this.serverOffset = store.serverOffsetMs;
+    } catch {
+      this.seasons = []; // API down/offline — season tab just shows "nothing on sale"
+    }
+    this.seasonLoaded = true;
+    if (this.seasonMode) this.render();
+  }
+
+  /** Season tab: live collections + countdown; buying fires buy_intent per season. */
+  private renderSeason() {
+    this.grid.classList.add('season');
+    this.grid.replaceChildren();
+    this.action.replaceChildren();
+
+    if (!this.seasonLoaded) {
+      this.grid.appendChild(this.seasonMessage('กำลังโหลดของซีซัน…'));
+      return;
+    }
+    if (this.seasons.length === 0) {
+      this.grid.appendChild(this.seasonMessage('ยังไม่มีของขายในตอนนี้ — รอซีซันหน้า!'));
+      return;
+    }
+
+    const serverNow = Date.now() + this.serverOffset;
+    for (const col of this.seasons) {
+      const block = document.createElement('div');
+      block.className = 'season-block';
+
+      const head = document.createElement('div');
+      head.className = 'season-col-head';
+      const name = document.createElement('span');
+      name.className = 'season-col-name';
+      name.textContent = col.name;
+      head.appendChild(name);
+      if (col.ends_at) {
+        const cd = document.createElement('span');
+        cd.className = 'season-count';
+        cd.textContent = '⏳ ' + fmtCountdown(new Date(col.ends_at).getTime() - serverNow);
+        head.appendChild(cd);
+      }
+      block.appendChild(head);
+
+      const grid = document.createElement('div');
+      grid.className = 'season-items';
+      for (const it of col.items) {
+        const owned = demoStore.isSeasonOwned(it.id);
+        const afford = demoStore.getJil() >= it.price_jil;
+        const rarity = (['common', 'rare', 'epic'].includes(it.rarity) ? it.rarity : 'common') as Rarity;
+
+        const cell = document.createElement('button');
+        cell.className = 'season-item' + (owned ? ' owned' : '');
+        cell.style.borderColor = owned ? '#5aa563' : RARITY_COLOR[rarity];
+
+        const nm = document.createElement('div');
+        nm.className = 'si-name';
+        nm.textContent = it.name;
+        const meta = document.createElement('div');
+        meta.className = 'si-meta';
+        meta.textContent = owned
+          ? '✓ ปลดล็อกแล้ว'
+          : afford
+            ? `💎 ${it.price_jil.toLocaleString('th-TH')} (demo)`
+            : `Jil ไม่พอ (${it.price_jil.toLocaleString('th-TH')})`;
+        cell.append(nm, meta);
+
+        if (owned || !afford) {
+          cell.disabled = true;
+        } else {
+          cell.addEventListener('click', () => {
+            demoStore.buySeasonItem(
+              { id: it.id, type: it.type, priceJil: it.price_jil, rarity: it.rarity },
+              { id: col.id, theme: col.theme },
+            );
+            // demoStore.changed() → subscribe → render() re-runs with owned state
+          });
+        }
+        grid.appendChild(cell);
+      }
+      block.appendChild(grid);
+      this.grid.appendChild(block);
+    }
+
+    const hint = document.createElement('div');
+    hint.className = 'store-info';
+    hint.innerHTML = '<span>ของตามฤดูกาล — หมดเวลาแล้วหาย</span>';
+    this.action.appendChild(hint);
+  }
+
+  private seasonMessage(text: string): HTMLDivElement {
+    const el = document.createElement('div');
+    el.className = 'season-empty';
+    el.textContent = text;
+    return el;
+  }
+
   private close() {
     this.control.preview(this.equipped); // drop any unbought preview
     this.destroy();
@@ -277,6 +418,7 @@ export class StoreModal {
 
   destroy() {
     this.unsub();
+    clearInterval(this.countdownTimer);
     this.root.remove();
   }
 }

@@ -41,6 +41,7 @@ export interface Metrics {
   };
   funnel: { key: string; sessions: number }[];
   demand: { item_id: string; item_type: string; intents: number; would_be_revenue: number }[];
+  demand_by_season: { collection_id: string; name: string; theme: string; intents: number; would_be_revenue: number }[];
   timeseries: { day: string; total: number; buy_intent: number; sessions: number }[];
   referrers: { key: string; count: number }[];
   topups: { user_id: string; family_name: string; email: string; total_jil: number; count: number }[];

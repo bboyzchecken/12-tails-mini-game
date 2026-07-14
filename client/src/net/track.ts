@@ -111,6 +111,8 @@ export interface BuyIntentInput {
   priceJil: number;
   hero?: string;
   rarity?: string;
+  collectionId?: string; // set when the item comes from a scheduled season (Phase 5)
+  theme?: string; // the season's theme, e.g. "summer" — powers "ดีมานด์ต่อซีซัน"
 }
 
 /** Demand signal: someone would spend Jil on this item. NOT a real sale. */
@@ -122,6 +124,8 @@ export function trackBuyIntent(i: BuyIntentInput): void {
       price_jil: i.priceJil,
       ...(i.hero ? { hero: i.hero } : {}),
       ...(i.rarity ? { rarity: i.rarity } : {}),
+      ...(i.collectionId ? { collection_id: i.collectionId } : {}),
+      ...(i.theme ? { theme: i.theme } : {}),
     },
   });
 }

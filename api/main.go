@@ -21,10 +21,12 @@ import (
 	"github.com/mac-checken/12tails-api/pkg/logger"
 	"github.com/mac-checken/12tails-api/pkg/models"
 	characterstore "github.com/mac-checken/12tails-api/pkg/store/character"
+	collectionstore "github.com/mac-checken/12tails-api/pkg/store/collection"
 	eventstore "github.com/mac-checken/12tails-api/pkg/store/event"
 	topupstore "github.com/mac-checken/12tails-api/pkg/store/topup"
 	userstore "github.com/mac-checken/12tails-api/pkg/store/user"
 	waitliststore "github.com/mac-checken/12tails-api/pkg/store/waitlist"
+	"github.com/mac-checken/12tails-api/pkg/utils/liveness"
 )
 
 func main() {
@@ -59,9 +61,11 @@ func main() {
 			userstore.New,
 			characterstore.New,
 			topupstore.New,
+			collectionstore.New,
 			api.NewServer,
 		),
 		fx.Invoke(seedAdmin),
+		fx.Invoke(seedCollections),
 		fx.Invoke(registerServer),
 		fx.WithLogger(func() fxevent.Logger { return fxevent.NopLogger }),
 	).Run()
@@ -100,6 +104,98 @@ func seedAdmin(cfg core.Config, log *logrus.Logger, us models.UserStore) {
 		return
 	}
 	log.Infof("seeded admin account %s", email)
+}
+
+// seedCollections plants demo seasons on first start (when the table is empty)
+// so the admin timeline + demo store have something to show: one live season,
+// one already ended, and one scheduled for the future — enough to demonstrate
+// "items appear/disappear on schedule" and the rotation/timeline UI. It never
+// overwrites operator data (only runs when Count()==0). Windows are relative to
+// startup time, so the demo is always live/past/future regardless of the date.
+func seedCollections(log *logrus.Logger, cs models.CollectionStore) {
+	n, err := cs.Count()
+	if err != nil {
+		log.WithError(err).Warn("season seed: count failed")
+		return
+	}
+	if n > 0 {
+		return // already seeded or operator-managed
+	}
+	now := time.Now()
+	at := func(t time.Time) *time.Time { return &t }
+	str := func(s string) *string { return &s }
+
+	type item struct {
+		name, typ, rarity string
+		price             int
+	}
+	seasons := []struct {
+		name, theme string
+		start, end  time.Time
+		items       []item
+	}{
+		{
+			name: "ชุดฤดูร้อน 2026", theme: "summer",
+			start: now.AddDate(0, 0, -2), end: now.AddDate(0, 0, 12), // LIVE now
+			items: []item{
+				{"สกินชายหาด", "skin", "epic", 1200},
+				{"สีฟ้าทะเล", "color", "rare", 400},
+				{"อีโมทกระโดดน้ำ", "emote", "rare", 350},
+				{"กรอบแชทเปลือกหอย", "chat_frame", "common", 180},
+			},
+		},
+		{
+			name: "ชุดสงกรานต์ 2026", theme: "songkran",
+			start: now.AddDate(0, 0, -45), end: now.AddDate(0, 0, -20), // ENDED (past)
+			items: []item{
+				{"สกินปืนฉีดน้ำ", "skin", "epic", 900},
+				{"อีโมทสาดน้ำ", "emote", "rare", 320},
+				{"กรอบแชทดอกไม้", "chat_frame", "common", 150},
+			},
+		},
+		{
+			name: "ชุดฮาโลวีน 2026", theme: "halloween",
+			start: now.AddDate(0, 0, 25), end: now.AddDate(0, 0, 40), // SCHEDULED (future)
+			items: []item{
+				{"สกินแวมไพร์", "skin", "epic", 1400},
+				{"สีม่วงรัตติกาล", "color", "rare", 500},
+				{"อีโมทหลอน", "emote", "common", 280},
+			},
+		},
+	}
+
+	seeded := 0
+	for _, sc := range seasons {
+		col := &models.Collection{
+			ID:        uuid.NewString(),
+			Name:      sc.name,
+			Theme:     str(sc.theme),
+			SaleStart: at(sc.start),
+			SaleEnd:   at(sc.end),
+			Status:    liveness.StatusScheduled,
+		}
+		if err := cs.Create(col); err != nil {
+			log.WithError(err).Warn("season seed: create collection failed")
+			continue
+		}
+		for _, si := range sc.items {
+			it := &models.CosmeticItem{
+				ID:           uuid.NewString(),
+				CollectionID: col.ID,
+				Name:         si.name,
+				Type:         si.typ,
+				PriceJil:     si.price,
+				Rarity:       si.rarity,
+				Preview:      "placeholder",
+				Active:       true,
+			}
+			if err := cs.CreateItem(it); err != nil {
+				log.WithError(err).Warn("season seed: create item failed")
+			}
+		}
+		seeded++
+	}
+	log.Infof("seeded %d demo season collections", seeded)
 }
 
 // registerServer starts/stops the Echo server on the FX lifecycle.

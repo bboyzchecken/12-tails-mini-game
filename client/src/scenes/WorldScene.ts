@@ -15,7 +15,7 @@ import { EmoteWheel } from '../ui/EmoteWheel';
 const MAP_NAME = 'ค่ายมือใหม่';
 /** ค่าโชว์บน HUD จนกว่าจะมีระบบ progression/wallet จริง (demo — ดู monetization plan) */
 const DEMO_SELF = { level: 1, xp: 20, xpMax: 100 };
-const DEMO_WALLET = { jil: 1200, coins: 300 };
+const DEMO_WALLET = { jil: 1200, scales: 0 };
 
 interface WorldInit {
   characterId: string;

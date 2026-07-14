@@ -52,8 +52,8 @@ export function mountPlayerHUD() {
   const curRow = document.createElement('div');
   curRow.className = 'cur-row';
   const jil = makeCurrency('cur-jil', ICON_GEM, 'Jil (demo — ไม่ใช่เงินจริง)');
-  const coins = makeCurrency('cur-coin', ICON_COINS, 'เหรียญ (demo)');
-  curRow.append(jil.el, coins.el);
+  const scales = makeCurrency('cur-coin', ICON_COINS, 'เกล็ด (ได้จากตกปลา · ใช้ในสายตกปลา)');
+  curRow.append(jil.el, scales.el);
 
   col.append(nameRow, xpBar, curRow);
   el.append(avatarWrap, col);
@@ -72,7 +72,7 @@ export function mountPlayerHUD() {
 
   gameToUI.on('player:currency', (c) => {
     jil.value.textContent = c.jil.toLocaleString('th-TH');
-    coins.value.textContent = c.coins.toLocaleString('th-TH');
+    scales.value.textContent = c.scales.toLocaleString('th-TH');
   });
 
   uiRoot.mount(el);

@@ -23,6 +23,8 @@ import { trimClips } from './CharacterAsset';
 import { dualWieldHands, defaultWeapon, getHeroCostumes, getHeroEquipment } from '../ui/equipmentIndex';
 import { LocalPlayer3D, RemotePlayer3D, PX_TO_UNIT } from './Player3D';
 import { OverheadLayer } from './Overhead';
+import { audio } from '../audio/AudioManager';
+import { FishingController } from '../fishing/FishingController';
 
 /** ชื่อแมพบน HUD (ค่าเดิมจาก WorldScene — ย้ายไป map data เมื่อมีหลายแมพ) */
 const MAP_NAME = 'ค่ายมือใหม่';
@@ -137,6 +139,7 @@ export class World3D {
   private chat!: ChatOverlay;
   private emotePanel!: EmotePanel;
   private customize!: CustomizePanel;
+  private fishing!: FishingController;
   private appearance: Appearance;
 
   private keys = new Set<string>();
@@ -158,6 +161,7 @@ export class World3D {
   private storeBtn?: HTMLButtonElement;
   private menuBtn?: HTMLButtonElement;
   private menu?: HTMLDivElement;
+  private audioBtn?: HTMLButtonElement;
   private lastSent: SentState | null = null;
 
   // Day/night: lighting refs + one loaded group per map variant.
@@ -193,6 +197,7 @@ export class World3D {
     // hero's novice weapon (both filled only when the caller left them unset, so
     // a deliberate "no outfit" / different weapon is preserved).
     this.appearance = await this.withStarterDefaults(this.appearance);
+    audio.init(); // สร้างกราฟเสียง + ผูก gesture ปลดล็อก (ก่อน setupWorld ที่จะสั่งเล่น BGM)
     this.setupRenderer();
     this.setupWorld();
     this.setupPlayer();
@@ -201,6 +206,7 @@ export class World3D {
     this.setupNetwork();
     this.setupChat();
     this.setupEmotes();
+    this.setupFishing();
     this.setupUIBridge();
     this.dayNight = new DayNightToggle({
       initial: DEFAULT_MAP_VARIANT,
@@ -218,6 +224,7 @@ export class World3D {
     });
     this.makeStoreButton(control);
     this.makeMenuButton();
+    this.makeAudioButton();
     this.renderer.setAnimationLoop(() => this.tick());
   }
 
@@ -344,6 +351,9 @@ export class World3D {
       if (g !== 'loading') g.visible = k === v;
     }
     if (!this.mapGroups.has(v)) void this.loadMap(v);
+
+    // BGM ฉากตามเวลากลางวัน/คืน (crossfade mood) — เล่นพร้อม SFX ตกปลาได้
+    audio.playBgm(v === 'night' ? 'bgm.night' : 'bgm.day');
   }
 
   /** Load one map variant's glb if present (fire-and-forget — the world is
@@ -817,6 +827,55 @@ export class World3D {
     this.socket.on('emote:played', onEmote);
   }
 
+  // --------------------------------------------------------------- fishing
+
+  /** โมดูลตกปลา 2D (self-contained) — 3D แค่บอก "ใกล้จุดไหม" ผ่าน setNearbySpot ใน tick */
+  private setupFishing() {
+    this.fishing = new FishingController({
+      onCast: (spotId) => this.socket.emit('fishing:cast', { spotId }),
+      canInteract: () => this.inputEnabled, // กันกด F ระหว่างพิมพ์แชท
+    });
+
+    // ผลตัดสินจาก server (client เล่นอนิเมชันตามผล — spec §5)
+    const onResult: ServerToClientEvents['fishing:result'] = (r) => this.fishing.showResult(r);
+    // ประกาศ epic/legendary ของคนอื่น → toast hype ("คนหันมามอง")
+    const onAnnounce: ServerToClientEvents['fishing:announce'] = ({ name, fishId, tier }) =>
+      this.fishing.hype(name, fishId, tier);
+    this.socket.on('fishing:result', onResult);
+    this.socket.on('fishing:announce', onAnnounce);
+  }
+
+  /** ระยะกำลังสองจากจุด P ถึง segment AB (px space) */
+  private static distSqToSegment(
+    px: number, py: number, ax: number, ay: number, bx: number, by: number,
+  ): number {
+    const abx = bx - ax;
+    const aby = by - ay;
+    const len2 = abx * abx + aby * aby;
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * abx + (py - ay) * aby) / len2));
+    const dx = px - (ax + t * abx);
+    const dy = py - (ay + t * aby);
+    return dx * dx + dy * dy;
+  }
+
+  /** จุดตกปลาที่ยืนอยู่ในโซน (trigger zone แบบ data ล้วน — ไม่ raycast เช็กน้ำ):
+   *  spot = เส้นกลางลำน้ำ (path) + รัศมี → อยู่ห่างเส้น ≤ radius คือตกได้ */
+  private nearestFishingSpot(): { id: string; name: string } | null {
+    if (!CONFIG.FISHING.ENABLED) return null;
+    const { x, y } = this.player.posPx;
+    for (const s of CONFIG.FISHING.SPOTS) {
+      const r2 = s.radius * s.radius;
+      for (let i = 0; i + 1 < s.path.length; i++) {
+        const [ax, ay] = s.path[i];
+        const [bx, by] = s.path[i + 1];
+        if (World3D.distSqToSegment(x, y, ax, ay, bx, by) <= r2) {
+          return { id: s.id, name: s.nameTH };
+        }
+      }
+    }
+    return null;
+  }
+
   // -------------------------------------------------------------- demo store
 
   private storeOpen = false;
@@ -837,6 +896,29 @@ export class World3D {
     btn.addEventListener('click', () => this.openStore(control));
     document.body.appendChild(btn);
     this.storeBtn = btn;
+  }
+
+  // -------------------------------------------------------------- audio
+
+  private syncAudioBtn?: () => void;
+
+  /** ปุ่มเปิด/ปิดเสียง 🔊 (side-btn s5) — คุมทั้ง BGM + SFX (master mute) */
+  private makeAudioButton() {
+    const btn = document.createElement('button');
+    btn.className = 'side-btn s5';
+    const sync = () => {
+      btn.textContent = audio.isMuted ? '🔇' : '🔊';
+      btn.title = audio.isMuted ? 'เปิดเสียง' : 'ปิดเสียง';
+      btn.classList.toggle('on', !audio.isMuted);
+    };
+    sync();
+    btn.addEventListener('click', () => {
+      audio.toggleMuted();
+      sync();
+    });
+    document.body.appendChild(btn);
+    this.audioBtn = btn;
+    this.syncAudioBtn = sync;
   }
 
   // ------------------------------------------------------------ world menu
@@ -914,12 +996,15 @@ export class World3D {
     safe(() => this.chat.destroy());
     safe(() => this.emotePanel.destroy());
     safe(() => this.customize.destroy());
+    safe(() => this.fishing.destroy());
+    safe(() => audio.stopBgm()); // ออกจากโลก = หยุด BGM (คง AudioContext + mute setting ไว้ให้รอบหน้า)
     safe(() => this.dayNight.destroy());
     safe(() => this.loading.destroy());
     safe(() => this.joystick?.destroy());
     this.storeBtn?.remove();
     this.menuBtn?.remove();
     this.menu?.remove();
+    this.audioBtn?.remove();
     document.body.classList.remove('touch');
 
     safe(() => this.renderer.dispose());
@@ -935,11 +1020,13 @@ export class World3D {
       name: this.init.name,
       ...DEMO_SELF,
     });
-    demoStore.emitCurrency(); // Jil/coins come from the demo wallet (persisted)
+    demoStore.emitCurrency(); // Jil/เกล็ด come from the demo wallet (persisted)
     this.emitOnline();
 
+    // เปิด/ปิดเสียงจาก bus (เช่นปุ่มใน UI อื่น) → toggle master mute จริง
     uiToGame.on('music:toggle', () => {
-      console.log('[world3d] bus OK: music:toggle received');
+      audio.toggleMuted();
+      this.syncAudioBtn?.();
     });
   }
 
@@ -977,6 +1064,9 @@ export class World3D {
     // Overheads follow their owners.
     this.overheads.place('self', this.player.headPos, this.camera);
     for (const [id, r] of this.remotes) this.overheads.place(id, r.headPos, this.camera);
+
+    // ตกปลา: บอกโมดูล 2D ว่าตอนนี้ยืนใกล้จุดไหน (โชว์/ซ่อน prompt กด F)
+    this.fishing.setNearbySpot(this.nearestFishingSpot());
 
     this.sendMove(dt * 1000);
     this.renderer.render(this.scene, this.camera);

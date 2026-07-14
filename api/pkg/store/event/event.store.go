@@ -80,6 +80,26 @@ func (s *eventStore) Demand(from, to time.Time, limit int) ([]models.DemandRow, 
 	return rows, err
 }
 
+// DemandByCollection groups buy_intent by the collection_id carried in the event
+// meta (set when an item is bought from a season in the demo store), joined to
+// the collections table for a display name. Powers "ดีมานด์ต่อซีซัน".
+func (s *eventStore) DemandByCollection(from, to time.Time) ([]models.CollectionDemandRow, error) {
+	var rows []models.CollectionDemandRow
+	err := s.db.Raw(`
+		SELECT e.meta->>'collection_id' AS collection_id,
+		       COALESCE(max(c.name), '') AS name,
+		       COALESCE(max(e.meta->>'theme'), '') AS theme,
+		       count(*) AS intents,
+		       COALESCE(sum((e.meta->>'price_jil')::numeric), 0)::bigint AS would_be_revenue
+		FROM events e
+		LEFT JOIN collections c ON c.id = e.meta->>'collection_id'
+		WHERE e.type = 'buy_intent' AND e.meta->>'collection_id' IS NOT NULL
+		  AND e.created_at >= ? AND e.created_at < ?
+		GROUP BY e.meta->>'collection_id'
+		ORDER BY intents DESC, would_be_revenue DESC`, from, to).Scan(&rows).Error
+	return rows, err
+}
+
 func (s *eventStore) TimeSeries(from, to time.Time) ([]models.DailyPoint, error) {
 	var rows []models.DailyPoint
 	err := s.db.Raw(`

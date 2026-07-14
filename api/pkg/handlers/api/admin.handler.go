@@ -70,6 +70,8 @@ func (s *Server) AdminMetrics(c echo.Context) error {
 	fail("funnel", err)
 	demand, err := s.EventStore.Demand(from, to, 20)
 	fail("demand", err)
+	demandBySeason, err := s.EventStore.DemandByCollection(from, to)
+	fail("demand_by_season", err)
 	series, err := s.EventStore.TimeSeries(from, to)
 	fail("timeseries", err)
 	referrers, err := s.EventStore.Referrers(from, to, 10)
@@ -88,11 +90,12 @@ func (s *Server) AdminMetrics(c echo.Context) error {
 			"would_be_revenue": revenue,
 		},
 		// Coerce nil→[] so the frontend can always .map() the lists.
-		"funnel":     orEmpty(funnel),
-		"demand":     orEmpty(demand),
-		"timeseries": orEmpty(series),
-		"referrers":  orEmpty(referrers),
-		"topups":     orEmpty(topups),
+		"funnel":           orEmpty(funnel),
+		"demand":           orEmpty(demand),
+		"demand_by_season": orEmpty(demandBySeason),
+		"timeseries":       orEmpty(series),
+		"referrers":        orEmpty(referrers),
+		"topups":           orEmpty(topups),
 		// Dashboard copy must never call this "revenue/ยอดขาย".
 		"note": "buy_intent = ความสนใจ/ประมาณการ ไม่ใช่ยอดขายจริง",
 	})

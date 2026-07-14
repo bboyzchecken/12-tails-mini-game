@@ -34,6 +34,18 @@ export interface ChatMessage {
   ts: number;
 }
 
+export type FishTier = 'common' | 'rare' | 'epic' | 'legendary';
+
+/** ผลตกปลาที่ server ชี้ขาด (client เล่นอนิเมชันตามนี้ ห้ามสุ่มเอง — spec §5) */
+export interface FishingResult {
+  spotId: string;
+  fishId: string;     // id ใน CONFIG.FISHING.FISH
+  tier: FishTier;
+  caught: boolean;    // ติด (true) หรือ หลุด (false)
+  chance: number;     // %โอกาสจับที่โชว์บนจอ (0..1) — ค่าที่ server ใช้ตัดสิน
+  price: number;      // ราคาขาย (เกล็ด) ถ้าเก็บแล้วขาย
+}
+
 // Client -> Server
 export interface ClientToServerEvents {
   'player:join': (p: { characterId: string; name: string; familyName?: string; appearance: Appearance; x: number; y: number; dir: Direction }) => void;
@@ -41,6 +53,7 @@ export interface ClientToServerEvents {
   'chat:send':   (p: { text: string }) => void;
   'emote:send':  (p: { emoteId: string }) => void;
   'appearance:set': (p: { appearance: Appearance }) => void;
+  'fishing:cast': (p: { spotId: string }) => void; // ขอเริ่มตกปลาที่จุดนี้ (server ตัดสินผล)
 }
 
 // Server -> Client
@@ -52,4 +65,6 @@ export interface ServerToClientEvents {
   'chat:message':   (m: ChatMessage) => void;
   'emote:played':   (p: { id: string; emoteId: string }) => void;
   'appearance:changed': (p: { id: string; appearance: Appearance }) => void;
+  'fishing:result': (r: FishingResult) => void;                                  // ส่งกลับเฉพาะคนตก
+  'fishing:announce': (p: { name: string; fishId: string; tier: FishTier }) => void; // ประกาศ epic/legendary ให้ทุกคน (hype กลางแชท)
 }
