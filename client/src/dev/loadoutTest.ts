@@ -43,6 +43,9 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffe
 renderer.setSize(RW, RH);
 renderer.domElement.style.cssText = 'position:fixed;top:0;right:0';
 document.body.appendChild(renderer.domElement);
+// Release the GL context on navigate — otherwise repeated page loads leak
+// contexts until the browser hits its per-process cap and every render blacks out.
+addEventListener('pagehide', () => { try { renderer.forceContextLoss(); renderer.dispose(); } catch { /* */ } });
 scene.add(new THREE.HemisphereLight(0xffffff, 0x445533, 1.5));
 const dir = new THREE.DirectionalLight(0xffffff, 1.2);
 dir.position.set(1, 2, 1.5);
@@ -51,8 +54,16 @@ scene.add(dir);
 const NO_OUTFIT = params.has('noOutfit');
 const NO_WEAPON = params.has('noWeapon');
 
+/** Optional hat to equip on every hero (defaults per-hero when '1'/'auto'). */
+const HAT_PARAM = params.get('hat');
+/** A hat id that exists for most heroes, for the regression montage. */
+const COMMON_HAT = 'afro';
+
 /** Build one hero wearing the starter kit, using the real game code. */
-async function buildHero(hero: string): Promise<{ player: LocalPlayer3D; weapon: string | null }> {
+async function buildHero(
+  hero: string,
+  hatOverride?: string | null,
+): Promise<{ player: LocalPlayer3D; weapon: string | null }> {
   const asset = await loadCharacterAsset({ id: hero, model: `assets/models/${hero}.glb` });
   const weapon = NO_WEAPON ? null : await defaultWeapon(hero);
   const outfit = NO_OUTFIT ? null : CONFIG.DEFAULT_OUTFIT;
@@ -83,7 +94,56 @@ async function buildHero(hero: string): Promise<{ player: LocalPlayer3D; weapon:
       mirrorOff,
     );
   }
+
+  // Hat — the whole point of this pass. `hatOverride` (montage) wins; otherwise
+  // the ?hat= query param (a specific id, or '1'/'auto' → the hero's default).
+  const hatId =
+    hatOverride !== undefined
+      ? hatOverride
+      : HAT_PARAM && HAT_PARAM !== '1' && HAT_PARAM !== 'auto'
+        ? HAT_PARAM
+        : HAT_PARAM
+          ? COMMON_HAT
+          : null;
+  if (hatId) {
+    const hat = await loadEquipment(equipmentUrl(hero, 'hat', hatId));
+    if (hat) player.setEquipment('hat', hat, hero);
+    else console.warn(`[loadout] ${hero}: hat '${hatId}' not found`);
+  }
   return { player, weapon };
+}
+
+/** Montage of all heroes wearing `hatId` (default COMMON_HAT) — hat regression. */
+async function hatMontage(hatId: string = COMMON_HAT) {
+  const cols = 4, cw = 200, ch = 250;
+  const rows = Math.ceil(HEROES.length / cols);
+  const out = document.createElement('canvas');
+  out.width = cols * cw; out.height = rows * ch;
+  const octx = out.getContext('2d')!;
+  octx.fillStyle = '#2a2f26'; octx.fillRect(0, 0, out.width, out.height);
+  for (let i = 0; i < HEROES.length; i++) {
+    const hero = HEROES[i];
+    hud.textContent = `hat montage… ${hero} (${i + 1}/${HEROES.length})`;
+    const x = (i % cols) * cw, y = Math.floor(i / cols) * ch;
+    let label = `${hero}  ${hatId}`;
+    try {
+      const { player } = await buildHero(hero, hatId);
+      player.group.rotation.y = yaw;
+      scene.add(player.group);
+      settle(player);
+      renderer.render(scene, camera);
+      octx.drawImage(renderer.domElement, x, y, cw, ch);
+      scene.remove(player.group);
+    } catch (e) {
+      console.error(`[loadout] ${hero} FAILED`, e);
+      label = `${hero}  ERR: ${(e as Error).message?.slice(0, 22)}`;
+    }
+    octx.fillStyle = 'rgba(0,0,0,0.6)'; octx.fillRect(x, y, cw, 16);
+    octx.fillStyle = '#fff'; octx.font = '11px monospace';
+    octx.fillText(label, x + 4, y + 12);
+  }
+  showImg(out.toDataURL('image/jpeg', 0.6));
+  hud.textContent = 'hat montage ready';
 }
 
 /** Advance the idle animation to a stable pose (bones settle off bind pose). */
@@ -168,14 +228,68 @@ function shoot(): void {
   showImg(renderer.domElement.toDataURL('image/jpeg', 0.7));
 }
 
+/** Render once and POST the frame to the dev shot-sink (writes to D:/12tails/_shots).
+ *  Reliable headless capture — the live WebGL canvas otherwise times out. */
+async function snap(name = 'loadout'): Promise<string> {
+  renderer.render(scene, camera);
+  const data = renderer.domElement.toDataURL('image/jpeg', 0.85);
+  await fetch('/__shot', { method: 'POST', body: JSON.stringify({ name: `${name}.jpg`, data }) });
+  return `${name}.jpg`;
+}
+/** True once the solo hero (or a montage) has finished loading. */
+function ready(): boolean { return !!solo || !!document.getElementById('shot'); }
+
+/** Dump the live transforms of the head mount bone and the equipped hat. */
+function dbg(): unknown {
+  if (!solo) return 'no solo';
+  solo.group.updateMatrixWorld(true);
+  const out: Record<string, unknown> = {};
+  const v = new THREE.Vector3();
+  solo.group.traverse((o) => {
+    if (/mount_?overhead|mount_?head|^head$/i.test(o.name) && !out['mount']) {
+      o.getWorldPosition(v);
+      out['mount'] = { name: o.name, world: v.toArray().map((n) => +n.toFixed(3)) };
+    }
+    const m = o as THREE.Mesh;
+    if (m.isMesh && !(o as THREE.SkinnedMesh).isSkinnedMesh) {
+      o.getWorldPosition(v);
+      const box = new THREE.Box3().setFromObject(o);
+      out['hatMesh'] = {
+        name: o.name,
+        localPos: o.position.toArray().map((n) => +n.toFixed(3)),
+        localQuat: o.quaternion.toArray().map((n) => +n.toFixed(3)),
+        parent: o.parent?.name,
+        parentQuat: o.parent?.quaternion.toArray().map((n) => +n.toFixed(3)),
+        world: v.toArray().map((n) => +n.toFixed(3)),
+        bboxMin: box.min.toArray().map((n) => +n.toFixed(3)),
+        bboxMax: box.max.toArray().map((n) => +n.toFixed(3)),
+      };
+    }
+  });
+  return out;
+}
+
 function setYaw(r: number) {
   yaw = r;
   if (solo) solo.group.rotation.y = r;
 }
 
 (window as unknown as Record<string, unknown>).montage = montage;
+(window as unknown as Record<string, unknown>).hatMontage = hatMontage;
 (window as unknown as Record<string, unknown>).shoot = shoot;
+(window as unknown as Record<string, unknown>).snap = snap;
+(window as unknown as Record<string, unknown>).ready = ready;
+(window as unknown as Record<string, unknown>).dbg = dbg;
+// Live internals for interactive tuning from the console/harness driver.
+(window as unknown as Record<string, unknown>).__three = { THREE, scene, camera, renderer, getSolo: () => solo };
 (window as unknown as Record<string, unknown>).setYaw = setYaw;
 
+// When inspecting a hat, frame the head instead of the torso.
+if (soloHero && HAT_PARAM) {
+  camera.position.set(0, 1.55, 2.6);
+  camera.lookAt(0, 1.5, 0);
+}
+
 if (soloHero) void bootSolo(soloHero);
+else if (HAT_PARAM) void hatMontage(HAT_PARAM !== '1' && HAT_PARAM !== 'auto' ? HAT_PARAM : COMMON_HAT);
 else void montage();

@@ -5,20 +5,6 @@ import { instantiateCharacter, type CharacterAsset, type CharacterInstance } fro
 import { mountPatterns, type EquipSlot } from './EquipmentLoader';
 import { applyOutfit, type OutfitBinding } from './CostumeLoader';
 
-/**
- * Wolf is the reference rig — its weapons/hats are authored to sit correctly.
- * Other rigs orient their mount bones differently (cat's hand +Z points down,
- * wolf's points forward), so the same baked item pose lands wrong on them. These
- * are wolf's mount-bone orientations RELATIVE TO ITS BODY; at attach time we
- * rotate each hero's item by `heroBone_body⁻¹ · wolfBone_body` so the grip/hat
- * matches wolf's on every character. Wolf itself gets identity (unchanged).
- */
-const WOLF_REF: Record<EquipSlot, THREE.Quaternion> = {
-  weapon: new THREE.Quaternion(-0.10554, -0.04083, 0.92664, -0.35852),
-  weaponL: new THREE.Quaternion(0.02453, 0.0634, -0.36, 0.93047),
-  hat: new THREE.Quaternion(-0.49374, -0.50618, 0.49374, 0.50618),
-};
-
 /** Server keeps 2D pixel coords (x right, y down). 3D maps px → tiles: x→x, y→z. */
 export const PX_TO_UNIT = 1 / CONFIG.TILE;
 /** Fallback bubble height when a skeleton can't be measured. */
@@ -30,22 +16,27 @@ const ANIM_FADE = 0.18;
 const TURN_SPEED = 12; // rad/s toward target yaw
 
 /**
- * HAT PLACEMENT. The equipment items were exported from Unity STANDALONE (static
- * meshes) while the character rig was exported as a SKINNED mesh — UnityGLTF puts
- * the two through different coordinate conversions, so a hat's baked rotation
- * does NOT compose onto the head mount bone (it lands floating up-and-behind, the
- * long-standing bug). Reverse-engineering the exact frame bridge failed (the
- * skinned conversion isn't a clean basis change), so we place hats geometrically:
- * every hat mesh is authored with its long axis = local +Z, so we stand it
- * world-upright (mesh +Z → world +Y) and auto-seat its bounding-box bottom at the
- * head-top. Per-hat size and per-hero head shape both cancel out — no tuning.
- * Verified in the dev harness (client/public/dev-hat-test.html) across crown /
- * helmet / frozenCrown on chameleon.
+ * HAT PLACEMENT — reproduces the Unity game's equip EXACTLY (reverse-engineered
+ * from the rip, not tuned by eye). The game parents an accessory prefab to the
+ * `mount_OverHead` empty, ZEROES its mount-local position, and KEEPS the prefab's
+ * authored local rotation ({-0.5,-0.5,-0.5,0.5} on 54/59 wolf hats; identity on a
+ * few novelty ones). The showcase-grid position the prefab also carries (e.g.
+ * scorpionHelmet's {1,54,-76}) is discarded.
+ *
+ * That composes onto the exported glb with NO frame-bridging, because UnityGLTF
+ * applies ONE conversion — conjugation by diag(-1,1,1) (negate-X) — identically
+ * to skinned character bones AND standalone item meshes. Conjugation is a clean
+ * homomorphism (conv(A·B) = conv(A)·conv(B)), so the glb's baked hat rotation IS
+ * conv(prefab rotation): keeping it and parenting to a hero's mount bone yields
+ *   hat_world = mount_world · conv(R_local) = conv(Unity hat-world)
+ * i.e. the in-game seat, per-hero head shape included. Verified numerically
+ * against the rig for all 12 heroes (see the mount-convention investigation).
+ *
+ * This SUPERSEDES the earlier "stand the mesh world-upright + auto-seat its bbox
+ * bottom at the head-top" hack — that discarded the authored fit/tilt and looked
+ * pasted-on (the bug the user kept hitting). The premise it rested on (skinned vs
+ * standalone use different conversions) is simply false, per the glb data.
  */
-const HAT_SPIN = 0; // yaw about world-up; hats share one authored frame
-const HAT_SEAT_FUDGE = -0.15; // seat the ring slightly into the hair
-const X_AXIS = new THREE.Vector3(1, 0, 0);
-const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
 /** Actions that end in a held pose; everything else loops until the player moves. */
 const HOLD_END_ACTIONS = new Set(['sit', 'sleep', 'pose']);
@@ -196,10 +187,10 @@ abstract class PlayerBase {
 
   /**
    * Attach (or clear) an equipment mesh on a mount bone. The mesh follows the
-   * bone through animation because it's parented to it. The item glb already
-   * carries the authored hold pose (baked rotation on its mesh node, in the same
-   * Unity→glTF frame as the bone), so a plain local attach reproduces the game's
-   * grip — no re-orientation. `hero` selects the head bone for hats.
+   * bone through animation because it's parented to it. Hats reproduce the game's
+   * equip verbatim by keeping their baked rotation (see HAT PLACEMENT); weapons
+   * are placed geometrically (see WEAPON PLACEMENT). `hero` selects the head bone
+   * for hats.
    */
   setEquipment(slot: EquipSlot, obj: THREE.Object3D | null, hero = '', mirror = false) {
     const prev = this.equipped.get(slot);
@@ -218,45 +209,103 @@ abstract class PlayerBase {
       this.equipped.set(slot, obj);
       return;
     }
-    // Weapons: normalize this rig's mount-bone orientation to wolf's so the item's
-    // baked pose lands the same way on every character. `mirror` flips the off-hand
-    // copy (scale −Y) so a dual-wielder's reused main-hand mesh sits symmetrically
-    // on the mirrored left bone instead of pointing the wrong way.
-    obj.position.set(0, 0, 0);
-    obj.quaternion.copy(this.boneCorrection(bone, slot));
-    obj.scale.set(1, mirror ? -1 : 1, 1);
-    bone.add(obj);
+    // Weapons: place geometrically (see WEAPON PLACEMENT note). `mirror` flips the
+    // off-hand copy (scale −Y) so a dual-wielder's reused main-hand mesh sits
+    // symmetrically on the mirrored left bone instead of pointing the wrong way.
+    this.seatWeapon(obj, bone, mirror);
     this.equipped.set(slot, obj);
   }
 
   /**
-   * Seat a hat on the head. See the HAT PLACEMENT note above: stand the mesh
-   * world-upright (its long axis is local +Z → world +Y) and drop it so its
-   * bounding-box bottom rests at the head-top. The hat rides the head through
+   * WEAPON PLACEMENT. Like hats (see HAT PLACEMENT), equipment was exported from
+   * Unity as a STANDALONE static mesh while the rig is SKINNED — the two go
+   * through different coordinate conversions, so a weapon's baked rotation does
+   * NOT compose onto the hand mount bone (the long-standing "grip wrong on every
+   * hero" bug). So we strip the baked rotation and place the weapon
+   * geometrically: point its long axis (blade, authored grip-at-origin extending
+   * along one axis) down the forearm→hand line. That reproduces a relaxed grip —
+   * e.g. wolf's novice swords hang blade-down — and self-adjusts per rig because
+   * it reads each hero's actual arm direction. Compact items with no long axis
+   * (fist-worn gauntlets) just seat at the hand.
+   */
+  private seatWeapon(obj: THREE.Object3D, bone: THREE.Object3D, mirror: boolean) {
+    obj.traverse((o) => o.quaternion.identity()); // drop the mis-framed baked rot
+    obj.scale.set(1, mirror ? -1 : 1, 1);
+    obj.position.set(0, 0, 0);
+
+    const axis = this.longAxis(obj); // null → compact/fist-worn, leave as-is
+    bone.add(obj);
+    if (!axis) return;
+
+    bone.updateWorldMatrix(true, false);
+    const dir = this.forearmDir(bone);
+    if (!dir) return;
+    const boneQ = bone.getWorldQuaternion(new THREE.Quaternion());
+    const dirLocal = dir.applyQuaternion(boneQ.invert()).normalize();
+    obj.quaternion.setFromUnitVectors(axis, dirLocal);
+  }
+
+  /** The item's dominant local axis (unit vector) pointing away from the grip at
+   *  the origin, or null when the item is roughly compact (no clear long axis). */
+  private longAxis(obj: THREE.Object3D): THREE.Vector3 | null {
+    obj.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(obj);
+    if (box.isEmpty()) return null;
+    const size = box.getSize(new THREE.Vector3());
+    const ax = ['x', 'y', 'z'] as const;
+    let li = 0;
+    for (let i = 1; i < 3; i++) if (size[ax[i]] > size[ax[li]]) li = i;
+    const others = [0, 1, 2].filter((i) => i !== li).map((i) => size[ax[i]]);
+    if (size[ax[li]] / Math.max(1e-4, Math.max(...others)) < 2) return null;
+    const v = new THREE.Vector3();
+    v[ax[li]] = Math.abs(box.max[ax[li]]) >= Math.abs(box.min[ax[li]]) ? 1 : -1;
+    return v;
+  }
+
+  /** World-space direction the arm points toward the hand mount (grip line). */
+  private forearmDir(handBone: THREE.Object3D): THREE.Vector3 | null {
+    const parent = handBone.parent;
+    if (!parent) return null;
+    const hp = handBone.getWorldPosition(new THREE.Vector3());
+    const pp = parent.getWorldPosition(new THREE.Vector3());
+    const d = hp.sub(pp);
+    return d.lengthSq() < 1e-8 ? null : d.normalize();
+  }
+
+  /**
+   * Seat a hat on the head EXACTLY as the game does (see the HAT PLACEMENT note):
+   * parent to the crown mount, zero the mount-local position, and KEEP the baked
+   * rotation (= conv(prefab rotation)). The hat then rides the head through
    * animation because it's parented to the mount bone.
    */
   private seatHat(obj: THREE.Object3D, bone: THREE.Object3D) {
-    // Strip the baked (mis-framed) rotations so the mesh sits in its raw
-    // geometry frame; our own orientation then stands it up.
-    obj.traverse((o) => o.quaternion.identity());
-    obj.scale.set(1, 1, 1);
-
-    bone.updateWorldMatrix(true, false);
-    const mountQ = bone.getWorldQuaternion(new THREE.Quaternion());
-    const mountS = bone.getWorldScale(new THREE.Vector3());
-    const upright = new THREE.Quaternion()
-      .setFromAxisAngle(Y_AXIS, HAT_SPIN)
-      .multiply(new THREE.Quaternion().setFromAxisAngle(X_AXIS, -Math.PI / 2));
-    obj.quaternion.copy(mountQ.clone().invert().multiply(upright));
+    // The game parents the prefab ROOT to the mount with localPosition = 0 and
+    // keeps its authored rotation; scale is 1 on every hat prefab. Zero the
+    // wrapper AND the prefab root node(s): loadEquipment strips big showcase
+    // translations, but a few hats (halo, ligerMask) keep a small ~9u leftover
+    // that would otherwise fling them off the head. Do NOT touch the rotations —
+    // the glb's baked rotation already IS the correct mount-local rotation
+    // (Unity→glTF conversion is a homomorphism, so it composes on the mount bone).
     obj.position.set(0, 0, 0);
+    obj.scale.set(1, 1, 1);
+    for (const root of obj.children) root.position.set(0, 0, 0);
     bone.add(obj);
 
-    // Auto-seat: translate so the hat's world bbox bottom meets the head-top.
-    obj.updateWorldMatrix(true, true);
-    const bottom = new THREE.Box3().setFromObject(obj).min.y;
-    const target = this.bodyTopWorldY() + HAT_SEAT_FUDGE;
-    const worldDrop = new THREE.Vector3(0, target - bottom, 0);
-    obj.position.copy(worldDrop.applyQuaternion(mountQ.clone().invert()).divide(mountS));
+    // Fallback: heroes with no crown empty (penguin/whale) mount on the `Head`
+    // bone itself, which sits at head-CENTRE. Nudge the hat straight up to the
+    // skull top so it rests on the crown; orientation is left untouched.
+    if (/^head$/i.test(bone.name)) {
+      bone.updateWorldMatrix(true, false);
+      const boneY = bone.getWorldPosition(new THREE.Vector3()).y;
+      const lift = this.bodyTopWorldY() - boneY;
+      if (lift > 0) {
+        const mountQ = bone.getWorldQuaternion(new THREE.Quaternion());
+        const mountS = bone.getWorldScale(new THREE.Vector3());
+        obj.position.copy(
+          new THREE.Vector3(0, lift, 0).applyQuaternion(mountQ.invert()).divide(mountS),
+        );
+      }
+    }
   }
 
   /** World-space Y of the top of the body mesh(es) — the head-top the hat seats
@@ -265,15 +314,6 @@ abstract class PlayerBase {
     const box = new THREE.Box3();
     for (const m of this.bodyMeshes) box.expandByObject(m);
     return box.isEmpty() ? this.group.position.y + this.headUnits : box.max.y;
-  }
-
-  /** Rotation that makes `bone` present the item as wolf's equivalent bone does. */
-  private boneCorrection(bone: THREE.Object3D, slot: EquipSlot): THREE.Quaternion {
-    this.group.updateWorldMatrix(true, false);
-    const groupQ = this.group.getWorldQuaternion(new THREE.Quaternion());
-    const boneQ = bone.getWorldQuaternion(new THREE.Quaternion());
-    const boneBody = groupQ.invert().multiply(boneQ); // hero bone relative to body
-    return boneBody.invert().multiply(WOLF_REF[slot]);
   }
 
   private findBone(patterns: RegExp[]): THREE.Object3D | null {

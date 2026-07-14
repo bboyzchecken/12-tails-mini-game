@@ -40,6 +40,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // Honour a PORT from the harness (autoPort) so a second dev server can run
+    // alongside one already on 5173; falls back to the usual 5173.
+    port: Number(process.env.PORT) || 5173,
   },
 });
