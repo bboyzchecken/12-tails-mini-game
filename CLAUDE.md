@@ -57,7 +57,12 @@ Characters are 2.5D: sprites pre-rendered from the game's 3D models.
 
 ## Build order
 Implement 12tails-chat-PLAN.md phase by phase (core mechanics — done), then
-12tails-ui-roadmap.md U0–U6 (UI + demo business model). Do NOT start a phase
-until the previous phase's acceptance criteria pass. Commit after each phase.
-Web (landing + admin + analytics): 12tails-web-BUILD-PLAN.md — Phase 1/2/3/P/4/5
-done; next = Phase 6 (polish + deploy), then F (fishing).
+12tails-ui-roadmap.md U0–U6 (UI + demo business model — **done**: U5 = the
+BattlePass/Supporter/Collection/Gacha demo tabs in StoreModal; U6 = polish).
+Do NOT start a phase until the previous phase's acceptance criteria pass. Commit
+after each phase. Web (landing + admin + analytics): 12tails-web-BUILD-PLAN.md —
+Phase 1/2/3/P/4/5 done; next = Phase 6 (polish + deploy), then F (fishing).
+Demo-store rule: U5 surfaces are DEMO-only (mock Jil, every buy fires `buy_intent`
+with a distinct `item_type`, no payment); gacha keeps odds public + a pity counter
++ a direct-buy option (responsible design). New demo economy constants live beside
+the wallet in `client/src/ui/store/` (client-only), not `shared/config.ts`.

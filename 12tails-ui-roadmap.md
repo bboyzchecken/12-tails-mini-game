@@ -174,20 +174,21 @@ type UIToGame = {
 - [ ] ระบบ cosmetic apply จริงในโลก: skin=สลับ sheet, color=tint, chatFrame=กรอบ bubble, emote=เพิ่มใน wheel
 - **AC:** เปิดร้าน "ซื้อ" cosmetic (demo) แล้ว **เห็นบนตัวละครในแมพทันที** + client อื่นเห็นด้วย
 
-### U5 — โมเดลรายได้ที่เหลือ (DEMO)
-- [ ] BattlePassTab: free/premium track + สไลเดอร์จำลองความคืบหน้า
-- [ ] SupporterTab: tier + สมัคร (mock) → ป้าย/ห้องพิเศษ/emote
-- [ ] CollectionTab: "ชุดฤดูร้อน" ซื้อชิ้น/ยกเซ็ต (direct)
-- [ ] GachaTab: เติม Jil (mock) → สุ่มถุงฤดูร้อน (แอนิเมชันเปิด) + **ตาราง odds + pity counter + ปุ่มซื้อตรง**
-- [ ] ปุ่ม reset demo
-- **AC:** ทุกพื้นผิวเดโมได้ครบวงจร, mock ล้วน, safeguards ครบ (banner, "(demo)", ไม่มี payment)
+### U5 — โมเดลรายได้ที่เหลือ (DEMO) ✅ เสร็จแล้ว
+> ทำเป็น **แท็บใน `StoreModal`** (ตาม 12tails-panel-control-plan.md §3.2 — Collection/Gacha/BattlePass/Supporter = tabs) · data/สถานะอยู่ที่ `store/monetizationData.ts` + `store/demoState.ts` · ทุกการซื้อยิง `buy_intent` (item_type ต่างกัน) → dashboard demand
+- [x] BattlePassTab: free/premium track + สไลเดอร์จำลองความคืบหน้า (commit บนรีลีส, ปลดล็อก Premium = buy_intent `battlepass`)
+- [x] SupporterTab: 3 tier + สมัคร (mock) → ป้าย/ห้องพิเศษ/emote (buy_intent `supporter`)
+- [x] CollectionTab: "ชุดฤดูร้อน 2026" ซื้อชิ้น (buy_intent `collection`) / ยกเซ็ตลด 20% (buy_intent `collection_bundle`)
+- [x] GachaTab: สุ่มถุงฤดูร้อน (แอนิเมชันเปิด) + **ตาราง odds เปิดเผย + pity counter (การันตี epic ที่ 20) + ปุ่มซื้อตรง** (buy_intent `gacha`/`gacha_direct`)
+- [x] ปุ่ม reset demo (ล้าง U5 state ครบ) · Jil ปลอม + top-up (demo)
+- **AC ✅ verify แล้ว:** ทุกพื้นผิวเดโมครบวงจร (DOM smoke: 4 แท็บ render + pull→reveal) · mock ล้วน · safeguards ครบ (DEMO banner, ทุกปุ่ม "(demo)", ไม่มี payment, ไม่ใช้ ฿/$) · economy logic unit-verified 13/13 (pity guarantee, bundle price, affordability, reset)
 
-### U6 — Polish & pitch-ready
-- [ ] pass สไตล์ให้ทั้งจอเป็นชุดเดียวกัน + micro-animation เบาๆ + empty/loading states
-- [ ] เช็ค responsive มือถือทั้ง HUD/panel/modal
-- [ ] จัด **demo flow** ให้เดินโชว์ Bigbug ลื่น: จอเริ่ม → แชท → emote → เปิดร้าน → พรีวิว cosmetic → battle pass → gacha (โชว์ odds)
-- [ ] ให้ถ่าย screenshot/อัดคลิปได้สวย
-- **AC:** present ได้ตั้งแต่ต้นจนจบแบบลื่นทั้ง desktop + มือถือ, ดูเป็นเกมแชทจริง
+### U6 — Polish & pitch-ready ✅ เสร็จแล้ว
+- [x] micro-animation เบาๆ (modal pop-in, gacha reveal pop + rarity glow) + empty/loading states (gacha hint, season "กำลังโหลด/รอซีซันหน้า", owned dimming) · `prefers-reduced-motion` เคารพ
+- [x] responsive มือถือ: tab strip เลื่อนแนวนอน (10 แท็บ), store-foot wrap เต็มกว้าง, card grid 2-up — ต่อยอดจากฐาน mobile/portrait-lock ที่มีอยู่ (HUD/panel/joystick)
+- [x] **demo flow** ต่อเนื่องในโมดัลเดียว: พรีวิว cosmetic → ซีซัน → คอลเลกชัน → battle pass → supporter → gacha (โชว์ odds)
+- [x] ใช้ design tokens ชุดเดียว (`ui.css` `--ui-*`) ทั้งจอ — ไม่ hardcode สี (rarity มาจาก JS)
+- **AC ✅:** เดินโชว์ได้ตั้งแต่ต้นจนจบทั้ง desktop + มือถือ, ดูเป็นเกมแชทจริง (tsc + `vite build` ผ่าน)
 
 ---
 
@@ -209,7 +210,7 @@ type UIToGame = {
 ## 10. Definition of Done (พร้อม pitch)
 
 - [ ] ดูเป็น “เกมแชท” จริง: HUD + chat feed + emote + โปรไฟล์ + เพลง ครบ
-- [ ] โมเดลรายได้โชว์ครบ 5 พื้นผิว แบบ mock (banner + "(demo)" + ไม่มีจ่ายจริง)
+- [x] โมเดลรายได้โชว์ครบทุกพื้นผิว แบบ mock (ร้าน cosmetic + ซีซัน + คอลเลกชัน + battle pass + supporter + gacha · banner + "(demo)" + ไม่มีจ่ายจริง)
 - [ ] cosmetic ที่ "ซื้อ" เห็นบนตัวจริงในแมพ (พิสูจน์ว่า "จ่ายแล้วได้อะไร")
 - [ ] เดินโชว์ Bigbug ได้ลื่นทั้ง desktop + มือถือ
 - [ ] ยังใช้ placeholder art (ไม่ใส่ IP Bigbug จนกว่าได้ไฟเขียว)

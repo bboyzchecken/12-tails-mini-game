@@ -2,6 +2,10 @@ import { CONFIG } from '@12tails/shared/config';
 import type { FishTier } from '@12tails/shared/events';
 import { gameToUI } from '../bus';
 import { trackBuyIntent } from '../../net/track';
+import {
+  BATTLEPASS, COLLECTION, GACHA, collectionBundlePrice,
+  type Reward,
+} from './monetizationData';
 
 /**
  * Client-side DEMO economy (12tails-demo-monetization-plan.md): a fake Jil
@@ -33,6 +37,12 @@ interface Persisted {
   owned: string[];
   scales?: number;
   caught?: Record<string, number>; // fishId -> จำนวนในกระเป๋า (ยังไม่ขาย)
+  // U5 monetization demo (battle pass / supporter / gacha pity — all mock)
+  bpPremium?: boolean;
+  bpLevel?: number; // presenter-driven progress slider (0..maxLevel)
+  bpClaimed?: string[]; // reward ids already claimed
+  supporter?: string | null; // active supporter tier id
+  pity?: number; // gacha pulls since the last epic
 }
 
 export function cosmeticId(hero: string, type: CosmeticType, index: number): string {
@@ -67,6 +77,12 @@ class DemoStore {
   private owned = new Set<string>();
   private caught = new Map<string, number>(); // fishId -> count in inventory
   private listeners = new Set<() => void>();
+  // U5 monetization demo state (mock)
+  private bpPremium = false;
+  private bpLevel = 3; // start mid-track so the demo shows claimed + locked tiers
+  private bpClaimed = new Set<string>();
+  private supporter: string | null = null;
+  private pity = 0;
 
   constructor() {
     this.load();
@@ -81,6 +97,11 @@ class DemoStore {
         this.scales = typeof p.scales === 'number' ? p.scales : START_SCALES;
         this.owned = new Set(Array.isArray(p.owned) ? p.owned : []);
         this.caught = new Map(Object.entries(p.caught ?? {}));
+        this.bpPremium = p.bpPremium === true;
+        this.bpLevel = typeof p.bpLevel === 'number' ? p.bpLevel : 3;
+        this.bpClaimed = new Set(Array.isArray(p.bpClaimed) ? p.bpClaimed : []);
+        this.supporter = typeof p.supporter === 'string' ? p.supporter : null;
+        this.pity = typeof p.pity === 'number' ? p.pity : 0;
       }
     } catch {
       /* corrupt/absent — start fresh */
@@ -94,6 +115,11 @@ class DemoStore {
         scales: this.scales,
         owned: [...this.owned],
         caught: Object.fromEntries(this.caught),
+        bpPremium: this.bpPremium,
+        bpLevel: this.bpLevel,
+        bpClaimed: [...this.bpClaimed],
+        supporter: this.supporter,
+        pity: this.pity,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
@@ -243,8 +269,176 @@ class DemoStore {
     this.scales = START_SCALES;
     this.owned.clear();
     this.caught.clear();
+    this.bpPremium = false;
+    this.bpLevel = 3;
+    this.bpClaimed.clear();
+    this.supporter = null;
+    this.pity = 0;
     this.changed();
   }
+
+  // ------------------------------------------------ U5: Battle Pass (D2, mock)
+
+  isBpPremium(): boolean {
+    return this.bpPremium;
+  }
+
+  getBpLevel(): number {
+    return this.bpLevel;
+  }
+
+  /** Presenter-driven progress slider — simulate climbing tiers. No cost. */
+  setBpLevel(level: number) {
+    this.bpLevel = Math.max(0, Math.min(BATTLEPASS.maxLevel, Math.round(level)));
+    this.changed();
+  }
+
+  /** Unlock the premium track (mock Jil). Fires buy_intent 'battlepass'. */
+  buyBpPremium(): boolean {
+    if (this.bpPremium) return true;
+    if (this.jil < BATTLEPASS.premiumPrice) return false;
+    this.jil -= BATTLEPASS.premiumPrice;
+    this.bpPremium = true;
+    this.changed();
+    trackBuyIntent({
+      itemId: 'battlepass-premium',
+      itemType: 'battlepass',
+      priceJil: BATTLEPASS.premiumPrice,
+      theme: 'summer',
+    });
+    return true;
+  }
+
+  isTierClaimed(rewardId: string): boolean {
+    return this.bpClaimed.has(rewardId);
+  }
+
+  /** Claim a reached tier's reward (free always; premium needs the premium track). */
+  claimTier(reward: Reward, track: 'free' | 'premium', level: number): boolean {
+    if (this.bpClaimed.has(reward.id)) return true;
+    if (level > this.bpLevel) return false; // tier not reached yet
+    if (track === 'premium' && !this.bpPremium) return false;
+    this.bpClaimed.add(reward.id);
+    this.changed(); // claiming is a reward, not a spend — no buy_intent
+    return true;
+  }
+
+  // ------------------------------------------------- U5: Supporter (D2, mock)
+
+  supporterTier(): string | null {
+    return this.supporter;
+  }
+
+  /** Subscribe to a supporter tier (mock monthly). Fires buy_intent 'supporter'. */
+  subscribeSupporter(tierId: string, priceJil: number): boolean {
+    if (this.jil < priceJil) return false;
+    this.jil -= priceJil;
+    this.supporter = tierId;
+    this.changed();
+    trackBuyIntent({ itemId: tierId, itemType: 'supporter', priceJil });
+    return true;
+  }
+
+  // ------------------------------------------------ U5: Collection (D3, mock)
+
+  isCollectionOwned(itemId: string): boolean {
+    return this.owned.has(`col:${itemId}`);
+  }
+
+  /** Buy one collection piece directly (mock Jil). Fires buy_intent 'collection'. */
+  buyCollectionItem(item: { id: string; priceJil: number; rarity: string }): boolean {
+    if (this.isCollectionOwned(item.id)) return true;
+    if (this.jil < item.priceJil) return false;
+    this.jil -= item.priceJil;
+    this.owned.add(`col:${item.id}`);
+    this.changed();
+    trackBuyIntent({
+      itemId: item.id,
+      itemType: 'collection',
+      priceJil: item.priceJil,
+      rarity: item.rarity,
+      collectionId: COLLECTION.id,
+      theme: COLLECTION.theme,
+    });
+    return true;
+  }
+
+  /** Buy the whole set at the bundle price (mock). Fires one buy_intent 'collection_bundle'. */
+  buyCollectionBundle(): boolean {
+    const price = collectionBundlePrice();
+    if (this.jil < price) return false;
+    this.jil -= price;
+    for (const it of COLLECTION.items) this.owned.add(`col:${it.id}`);
+    this.changed();
+    trackBuyIntent({
+      itemId: `${COLLECTION.id}-bundle`,
+      itemType: 'collection_bundle',
+      priceJil: price,
+      collectionId: COLLECTION.id,
+      theme: COLLECTION.theme,
+    });
+    return true;
+  }
+
+  // ----------------------------------------------------- U5: Gacha (D4, mock)
+
+  getPity(): number {
+    return this.pity;
+  }
+
+  isGachaOwned(itemId: string): boolean {
+    return this.owned.has(`gacha:${itemId}`);
+  }
+
+  /**
+   * One gacha pull (mock Jil). Server-less demo: rolls by the PUBLISHED odds with a
+   * pity guarantee at GACHA.pityMax. Spending Jil = demand → buy_intent 'gacha'.
+   * Returns the reward, or null if too little Jil.
+   */
+  pullGacha(): { reward: Reward; rarity: Rarity; guaranteed: boolean } | null {
+    if (this.jil < GACHA.pullCost) return null;
+    this.jil -= GACHA.pullCost;
+
+    const guaranteed = this.pity + 1 >= GACHA.pityMax;
+    const rarity: Rarity = guaranteed ? 'epic' : rollGachaRarity();
+    if (rarity === 'epic') this.pity = 0;
+    else this.pity += 1;
+
+    const pool = GACHA.pool[rarity];
+    const reward = pool[Math.floor(Math.random() * pool.length)];
+    this.owned.add(`gacha:${reward.id}`);
+    this.changed();
+    trackBuyIntent({ itemId: reward.id, itemType: 'gacha', priceJil: GACHA.pullCost, rarity });
+    return { reward, rarity, guaranteed };
+  }
+
+  /** Buy a specific gacha reward directly, no RNG (mock). Fires buy_intent 'gacha_direct'. */
+  buyGachaDirect(reward: Reward): boolean {
+    if (this.isGachaOwned(reward.id)) return true;
+    const price = GACHA.directPrice[reward.rarity];
+    if (this.jil < price) return false;
+    this.jil -= price;
+    this.owned.add(`gacha:${reward.id}`);
+    this.changed();
+    trackBuyIntent({
+      itemId: reward.id,
+      itemType: 'gacha_direct',
+      priceJil: price,
+      rarity: reward.rarity,
+    });
+    return true;
+  }
+}
+
+/** Weighted rarity roll from the published gacha odds (percentages sum to 100). */
+function rollGachaRarity(): Rarity {
+  const r = Math.random() * 100;
+  let acc = 0;
+  for (const o of GACHA.odds) {
+    acc += o.pct;
+    if (r < acc) return o.rarity;
+  }
+  return 'common';
 }
 
 export const demoStore = new DemoStore();
